@@ -604,7 +604,7 @@ func (l *logger) Close() error {
 }
 
 func extractZapFieldsFromError(err error) []zap.Field {
-	fields := errors.AllFields(err)
+	fields := errors.StackFields(err)
 	return fields2ZapFields(fields)
 }
 
