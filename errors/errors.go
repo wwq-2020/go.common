@@ -6,6 +6,10 @@ import (
 	"github.com/wwq-2020/go.common/stack"
 )
 
+const (
+	unknownCode int = -1
+)
+
 // timeout timeout
 type timeout interface {
 	Timeout() bool
@@ -20,22 +24,23 @@ type stackError struct {
 	fields stack.Fields
 	stack  string
 	err    error
+	code   int
 }
 
 // New New
 func New(msg string) error {
-	return trace(errors.New(msg), nil)
+	return trace(errors.New(msg), unknownCode, nil)
 }
 
 // NewWithFields NewWithFields
 func NewWithFields(msg string, fields stack.Fields) error {
-	return trace(errors.New(msg), fields)
+	return trace(errors.New(msg), unknownCode, fields)
 }
 
 // NewWithField NewWithField
 func NewWithField(msg string, key string, val interface{}) error {
 	fields := stack.New().Set(key, val)
-	return trace(errors.New(msg), fields)
+	return trace(errors.New(msg), unknownCode, fields)
 }
 
 // Trace Trace
@@ -43,7 +48,7 @@ func Trace(err error) error {
 	if err == nil {
 		return nil
 	}
-	return trace(err, nil)
+	return trace(err, unknownCode, nil)
 }
 
 // Std Std
@@ -51,7 +56,7 @@ func Std(msg string) error {
 	return errors.New(msg)
 }
 
-func trace(err error, fields stack.Fields) error {
+func trace(err error, code int, fields stack.Fields) error {
 	se, ok := err.(*stackError)
 	if !ok {
 		stackFrame := stack.Callers(stack.StdFilter)
@@ -62,6 +67,7 @@ func trace(err error, fields stack.Fields) error {
 			err:    err,
 			fields: fields,
 			stack:  stackFrame,
+			code:   code,
 		}
 	}
 	if se.fields == nil {
@@ -116,15 +122,38 @@ func (s *stackError) Error() string {
 	return s.err.Error()
 }
 
+func (s *stackError) CodeIs(code int) bool {
+	return s.code == code
+}
+
+func (s *stackError) Code() int {
+	return s.code
+}
+
 // TraceWithFields TraceWithFields
 func TraceWithFields(err error, fields stack.Fields) error {
-	return trace(err, fields)
+	return trace(err, unknownCode, fields)
 }
 
 // TraceWithField TraceWithField
 func TraceWithField(err error, key string, val interface{}) error {
 	fields := stack.New().Set(key, val)
 	return TraceWithFields(err, fields)
+}
+
+// TraceWithCode TraceWithCode
+func TraceWithCode(err error, code int) error {
+	return trace(err, code, nil)
+}
+
+// TraceWithCodeWithField TraceWithCodeWithField
+func TraceWithCodeWithField(err error, code int, key string, val interface{}) error {
+	return trace(err, code, nil)
+}
+
+// TraceWithCodeWithFields TraceWithCodeWithFields
+func TraceWithCodeWithFields(err error, code int, fields stack.Fields) error {
+	return trace(err, code, fields)
 }
 
 // Is Is
@@ -184,4 +213,19 @@ func StackFields(err error) stack.Fields {
 func CanAs(err error) bool {
 	var se *stackError
 	return As(err, &se)
+}
+
+// CodeIs CodeIs
+func CodeIs(err error, code int) bool {
+	se, ok := err.(*stackError)
+	return ok && se.CodeIs(code)
+}
+
+// Code Code
+func Code(err error) int {
+	se, ok := err.(*stackError)
+	if !ok {
+		return unknownCode
+	}
+	return se.Code()
 }
