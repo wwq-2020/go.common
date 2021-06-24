@@ -93,7 +93,7 @@ func trace(err error, code int, fields stack.Fields) error {
 		se.fields = stack.New()
 	}
 	if fields != nil {
-		se.fields.Merge(fields)
+		se.fields = se.fields.Merge(fields)
 	}
 	return se
 }
@@ -105,7 +105,7 @@ func (s *stackError) WithField(key string, val interface{}) {
 
 // WithField WithFields
 func (s *stackError) WithFields(fields stack.Fields) {
-	s.fields.Merge(fields)
+	s.fields = s.fields.Merge(fields)
 }
 
 // Fields Fields
