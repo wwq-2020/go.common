@@ -3,6 +3,7 @@ package log
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"sync/atomic"
 	"time"
@@ -73,7 +74,7 @@ type Logger interface {
 	// WithZapFields WithZapFields
 	WithZapFields(fields ...zap.Field) Logger
 	// SetLevel SetLevel
-	SetLevel(Level)
+	SetLevel(Level) error
 	// Sync Sync
 	Sync() error
 	// Dup Dup
@@ -151,7 +152,10 @@ func NewEx(depth int, opts ...Option) Logger {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	zapLogger, _ := genZapConfig(&options).Build()
+	zapLogger, err := genZapConfig(&options).Build()
+	if err != nil {
+		log.Fatalf("failed to Build,err:%#v", err)
+	}
 	return &logger{
 		options: &options,
 		depth:   depth,
@@ -160,17 +164,12 @@ func NewEx(depth int, opts ...Option) Logger {
 }
 
 func genZapConfig(options *Options) zap.Config {
-
 	return zap.Config{
 		Level:             zap.NewAtomicLevelAt(zap.InfoLevel),
 		DisableCaller:     true,
 		DisableStacktrace: true,
 		Development:       false,
-		// Sampling: &zap.SamplingConfig{
-		// 	Initial:    100,
-		// 	Thereafter: 100,
-		// },
-		Encoding: "json",
+		Encoding:          "json",
 		EncoderConfig: zapcore.EncoderConfig{
 			TimeKey:       "ts",
 			LevelKey:      "level",
@@ -352,8 +351,8 @@ func PanicContext(ctx context.Context, msg string) {
 }
 
 // SetLevel SetLevel
-func SetLevel(level Level) {
-	std.SetLevel(level)
+func SetLevel(level Level) error {
+	return std.SetLevel(level)
 }
 
 // WithFields WithFields
@@ -601,7 +600,7 @@ func (l *logger) PanicContext(ctx context.Context, msg string) {
 }
 
 // SetLevel SetLevel
-func (l *logger) SetLevel(level Level) {
+func (l *logger) SetLevel(level Level) error {
 	cfg := genZapConfig(l.options)
 	switch level {
 	case PanicLevel:
@@ -617,7 +616,12 @@ func (l *logger) SetLevel(level Level) {
 	case DebugLevel:
 		cfg.Level = zap.NewAtomicLevelAt(zapcore.DebugLevel)
 	}
-	l.l, _ = cfg.Build()
+	zapLogger, err := cfg.Build()
+	if err != nil {
+		return errors.Trace(err)
+	}
+	l.l = zapLogger
+	return nil
 }
 
 // WithFields WithFields
