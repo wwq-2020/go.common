@@ -6,8 +6,9 @@ import (
 	"github.com/wwq-2020/go.common/stack"
 )
 
+// consts
 const (
-	unknownCode int = -1
+	UnknownCode int = -1
 )
 
 // timeout timeout
@@ -29,18 +30,18 @@ type stackError struct {
 
 // New New
 func New(msg string) error {
-	return trace(errors.New(msg), unknownCode, nil)
+	return trace(errors.New(msg), UnknownCode, nil)
 }
 
 // NewWithFields NewWithFields
 func NewWithFields(msg string, fields stack.Fields) error {
-	return trace(errors.New(msg), unknownCode, fields)
+	return trace(errors.New(msg), UnknownCode, fields)
 }
 
 // NewWithField NewWithField
 func NewWithField(msg string, key string, val interface{}) error {
 	fields := stack.New().Set(key, val)
-	return trace(errors.New(msg), unknownCode, fields)
+	return trace(errors.New(msg), UnknownCode, fields)
 }
 
 // Trace Trace
@@ -48,7 +49,7 @@ func Trace(err error) error {
 	if err == nil {
 		return nil
 	}
-	return trace(err, unknownCode, nil)
+	return trace(err, UnknownCode, nil)
 }
 
 // Std Std
@@ -132,7 +133,7 @@ func (s *stackError) Code() int {
 
 // TraceWithFields TraceWithFields
 func TraceWithFields(err error, fields stack.Fields) error {
-	return trace(err, unknownCode, fields)
+	return trace(err, UnknownCode, fields)
 }
 
 // TraceWithField TraceWithField
@@ -225,7 +226,7 @@ func CodeIs(err error, code int) bool {
 func Code(err error) int {
 	se, ok := err.(*stackError)
 	if !ok {
-		return unknownCode
+		return UnknownCode
 	}
 	return se.Code()
 }
