@@ -26,6 +26,7 @@ type stackError struct {
 	stack  string
 	err    error
 	code   int
+	tip    string
 }
 
 // New New
@@ -85,6 +86,7 @@ func trace(err error, code int, fields stack.Fields) error {
 			fields: fields,
 			stack:  stackFrame,
 			code:   code,
+			tip:    err.Error(),
 		}
 	}
 	if se.fields == nil {
@@ -261,8 +263,27 @@ func Replace(raw, err error) error {
 func ReplaceCode(raw error, code int) error {
 	se, ok := raw.(*stackError)
 	if !ok {
-		return se
+		return raw
 	}
 	se.code = code
+	return se
+}
+
+// Tip Tip
+func Tip(raw error, code int) string {
+	se, ok := raw.(*stackError)
+	if !ok {
+		return ""
+	}
+	return se.tip
+}
+
+// ReplaceTip ReplaceTip
+func ReplaceTip(raw error, tip string) error {
+	se, ok := raw.(*stackError)
+	if !ok {
+		return raw
+	}
+	se.tip = tip
 	return se
 }
