@@ -3,8 +3,8 @@ package httpx
 import (
 	"net/http"
 
-	"github.com/wwq-2020/go.common/ctxutil"
 	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/log"
 	"github.com/wwq-2020/go.common/stack"
 )
 
@@ -25,8 +25,7 @@ func ContentTypeReqInterceptor(contentType string) ReqInterceptor {
 // LoggingReqInterceptor LoggingReqInterceptor
 func LoggingReqInterceptor(httpReq *http.Request) error {
 	ctx := httpReq.Context()
-	logger := ctxutil.LoggerFromCtx(ctx)
-	logger = logger.WithField("method", httpReq.Method).
+	logger := log.ContextLoggerWithField(ctx, "method", httpReq.Method).
 		WithField("url", httpReq.URL.String())
 	if httpReq.Body != nil {
 		reqData, reqBody, err := drainBody(httpReq.Body)
@@ -36,7 +35,7 @@ func LoggingReqInterceptor(httpReq *http.Request) error {
 		httpReq.Body = reqBody
 		logger = logger.WithField("reqData", string(reqData))
 	}
-	logger.Info("do http req")
+	logger.InfoContext(ctx, "do http req")
 	return nil
 }
 
@@ -79,8 +78,7 @@ func StatusCodeRangeRespInterceptor(codeStart, codeEnd int) RespInterceptor {
 // LoggingRespInterceptor LoggingRespInterceptor
 func LoggingRespInterceptor(httpResp *http.Response) error {
 	ctx := httpResp.Request.Context()
-	logger := ctxutil.LoggerFromCtx(ctx)
-	logger = logger.WithField("statuscode", httpResp.StatusCode)
+	logger := log.ContextLoggerWithField(ctx, "statuscode", httpResp.StatusCode)
 	if httpResp.Body != nil {
 		respData, respBody, err := drainBody(httpResp.Body)
 		if err != nil {
@@ -89,7 +87,7 @@ func LoggingRespInterceptor(httpResp *http.Response) error {
 		logger = logger.WithField("respData", string(respData))
 		httpResp.Body = respBody
 	}
-	logger.Info("got http resp")
+	logger.InfoContext(ctx, "got http resp")
 	return nil
 }
 

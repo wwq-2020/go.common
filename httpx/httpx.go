@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/wwq-2020/go.common/ctxutil"
 	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/log"
 )
 
 // Get Get
@@ -53,7 +53,7 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	if err != nil {
 		return errors.Trace(err)
 	}
-	ctx = ctxutil.EnsureRequestID(ctx)
+	ctx = log.ContextEnsureTraceID(ctx)
 	httpReq = httpReq.WithContext(ctx)
 	if options.reqInterceptor != nil {
 		if err := options.reqInterceptor(httpReq); err != nil {
