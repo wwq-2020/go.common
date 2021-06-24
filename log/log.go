@@ -1,7 +1,6 @@
 package log
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -41,30 +40,6 @@ type Logger interface {
 	Debug(string)
 	// Debugf Debugf
 	Debugf(string, ...interface{})
-	// PanicContext PanicContext
-	PanicContext(context.Context, string)
-	// PanicfContext PanicfContext
-	PanicfContext(context.Context, string, ...interface{})
-	// FatalContext FatalContext
-	FatalContext(context.Context, string)
-	// FatalfContext FatalfContext
-	FatalfContext(context.Context, string, ...interface{})
-	// ErrorContext ErrorContext
-	ErrorContext(context.Context, error)
-	// ErrorfContext ErrorfContext
-	ErrorfContext(context.Context, string, ...interface{})
-	// WarnContext WarnContext
-	WarnContext(context.Context, string)
-	// WarnfContext WarnfContext
-	WarnfContext(context.Context, string, ...interface{})
-	// InfoContext InfoContext
-	InfoContext(context.Context, string)
-	// InfofContext InfofContext
-	InfofContext(context.Context, string, ...interface{})
-	// DebugContext DebugContext
-	DebugContext(context.Context, string)
-	// DebugfContext DebugfContext
-	DebugfContext(context.Context, string, ...interface{})
 	// WithFields WithFields
 	WithFields(stack.Fields) Logger
 	// WithError WithError
@@ -281,66 +256,6 @@ func Panic(msg string) {
 	std.Panic(msg)
 }
 
-// InfofContext InfofContext
-func InfofContext(ctx context.Context, msg string, args ...interface{}) {
-	std.InfofContext(ctx, msg, args...)
-}
-
-// InfoContext InfoContext
-func InfoContext(ctx context.Context, msg string) {
-	std.InfoContext(ctx, msg)
-}
-
-// ErrorfContext ErrorfContext
-func ErrorfContext(ctx context.Context, msg string, args ...interface{}) {
-	std.ErrorfContext(ctx, msg, args...)
-}
-
-// ErrorContext ErrorContext
-func ErrorContext(ctx context.Context, err error) {
-	std.ErrorContext(ctx, err)
-}
-
-// WarnfContext WarnfContext
-func WarnfContext(ctx context.Context, msg string, args ...interface{}) {
-	std.WarnfContext(ctx, msg, args...)
-}
-
-// WarnContext WarnContext
-func WarnContext(ctx context.Context, msg string) {
-	std.WarnContext(ctx, msg)
-}
-
-// DebugfContext DebugfContext
-func DebugfContext(ctx context.Context, msg string, args ...interface{}) {
-	std.DebugfContext(ctx, msg, args...)
-}
-
-// DebugContext DebugContext
-func DebugContext(ctx context.Context, msg string) {
-	std.DebugContext(ctx, msg)
-}
-
-// FatalfContext FatalfContext
-func FatalfContext(ctx context.Context, msg string, args ...interface{}) {
-	std.FatalfContext(ctx, msg, args...)
-}
-
-// FatalContext FatalContext
-func FatalContext(ctx context.Context, msg string) {
-	std.FatalContext(ctx, msg)
-}
-
-// PanicfContext PanicfContext
-func PanicfContext(ctx context.Context, msg string, args ...interface{}) {
-	std.PanicfContext(ctx, msg, args...)
-}
-
-// PanicContext PanicContext
-func PanicContext(ctx context.Context, msg string) {
-	std.PanicContext(ctx, msg)
-}
-
 // SetLevel SetLevel
 func SetLevel(level Level) {
 	std.SetLevel(level)
@@ -446,78 +361,6 @@ func (l *logger) Panicf(msg string, args ...interface{}) {
 
 // Panic Panic
 func (l *logger) Panic(msg string) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		Panic(msg)
-}
-
-// InfofContext InfofContext
-func (l *logger) InfofContext(ctx context.Context, msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).Info(fmt.Sprintf(msg, args...))
-}
-
-// InfoContext InfoContext
-func (l *logger) InfoContext(ctx context.Context, msg string) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		Info(msg)
-}
-
-// ErrorfContext ErrorfContext
-func (l *logger) ErrorfContext(ctx context.Context, msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		Error(fmt.Sprintf(msg, args...))
-}
-
-// ErrorContext ErrorContext
-func (l *logger) ErrorContext(ctx context.Context, err error) {
-	zapFields := extractZapFieldsFromError(err)
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		With(zapFields...).Error(err.Error())
-}
-
-// WarnfContext WarnfContext
-func (l *logger) WarnfContext(ctx context.Context, msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		Warn(fmt.Sprintf(msg, args...))
-}
-
-// WarnContext WarnContext
-func (l *logger) WarnContext(ctx context.Context, msg string) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		Warn(msg)
-}
-
-// DebugfContext DebugfContext
-func (l *logger) DebugfContext(ctx context.Context, msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		Debug(fmt.Sprintf(msg, args...))
-}
-
-// DebugContext DebugContext
-func (l *logger) DebugContext(ctx context.Context, msg string) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		Debug(msg)
-}
-
-// FatalfContext FatalfContext
-func (l *logger) FatalfContext(ctx context.Context, msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		Fatal(fmt.Sprintf(msg, args...))
-}
-
-// FatalContext FatalContext
-func (l *logger) FatalContext(ctx context.Context, msg string) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		Fatal(msg)
-}
-
-// PanicfContext PanicfContext
-func (l *logger) PanicfContext(ctx context.Context, msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		Panic(fmt.Sprintf(msg, args...))
-}
-
-// PanicContext PanicContext
-func (l *logger) PanicContext(ctx context.Context, msg string) {
 	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Panic(msg)
 }

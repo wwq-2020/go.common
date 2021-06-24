@@ -51,73 +51,73 @@ func LoggerFromCtx(ctx context.Context) log.Logger {
 // PanicContext PanicContext
 func PanicContext(ctx context.Context, msg string) {
 	logger := LoggerFromCtx(ctx)
-	logger.PanicContext(ctx, msg)
+	logger.Panic(msg)
 }
 
 // PanicfContext PanicfContext
 func PanicfContext(ctx context.Context, msg string, args ...interface{}) {
 	logger := LoggerFromCtx(ctx)
-	logger.PanicfContext(ctx, msg, args...)
+	logger.Panicf(msg, args...)
 }
 
 // FatalContext FatalContext
 func FatalContext(ctx context.Context, msg string) {
 	logger := LoggerFromCtx(ctx)
-	logger.FatalContext(ctx, msg)
+	logger.Fatal(msg)
 }
 
 // FatalfContext FatalfContext
 func FatalfContext(ctx context.Context, msg string, args ...interface{}) {
 	logger := LoggerFromCtx(ctx)
-	logger.FatalfContext(ctx, msg, args...)
+	logger.Fatalf(msg, args...)
 }
 
 // ErrorContext ErrorContext
 func ErrorContext(ctx context.Context, err error) {
 	logger := LoggerFromCtx(ctx)
-	logger.ErrorContext(ctx, err)
+	logger.Error(err)
 }
 
 // ErrorfContext ErrorfContext
 func ErrorfContext(ctx context.Context, msg string, args ...interface{}) {
 	logger := LoggerFromCtx(ctx)
-	logger.ErrorfContext(ctx, msg, args...)
+	logger.Errorf(msg, args...)
 }
 
 // WarnContext WarnContext
 func WarnContext(ctx context.Context, msg string) {
 	logger := LoggerFromCtx(ctx)
-	logger.WarnContext(ctx, msg)
+	logger.Warn(msg)
 }
 
 // WarnfContext WarnfContext
 func WarnfContext(ctx context.Context, msg string, args ...interface{}) {
 	logger := LoggerFromCtx(ctx)
-	logger.WarnfContext(ctx, msg, args...)
+	logger.Warnf(msg, args...)
 }
 
 // InfoContext InfoContext
 func InfoContext(ctx context.Context, msg string) {
 	logger := LoggerFromCtx(ctx)
-	logger.InfoContext(ctx, msg)
+	logger.Info(msg)
 }
 
 // InfofContext InfofContext
 func InfofContext(ctx context.Context, msg string, args ...interface{}) {
 	logger := LoggerFromCtx(ctx)
-	logger.InfofContext(ctx, msg, args...)
+	logger.Infof(msg, args...)
 }
 
 // DebugContext DebugContext
 func DebugContext(ctx context.Context, msg string) {
 	logger := LoggerFromCtx(ctx)
-	logger.DebugContext(ctx, msg)
+	logger.Debug(msg)
 }
 
 // DebugfContext DebugfContext
 func DebugfContext(ctx context.Context, msg string, args ...interface{}) {
 	logger := LoggerFromCtx(ctx)
-	logger.DebugfContext(ctx, msg, args...)
+	logger.Debugf(msg, args...)
 }
 
 // EnsureRequestID EnsureRequestID

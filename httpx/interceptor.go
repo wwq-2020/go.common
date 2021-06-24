@@ -36,7 +36,7 @@ func LoggingReqInterceptor(httpReq *http.Request) error {
 		httpReq.Body = reqBody
 		logger = logger.WithField("reqData", string(reqData))
 	}
-	logger.InfoContext(ctx, "do http req")
+	logger.Info("do http req")
 	return nil
 }
 
@@ -89,7 +89,7 @@ func LoggingRespInterceptor(httpResp *http.Response) error {
 		logger = logger.WithField("respData", string(respData))
 		httpResp.Body = respBody
 	}
-	logger.InfoContext(ctx, "got http resp")
+	logger.Info("got http resp")
 	return nil
 }
 
