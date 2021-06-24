@@ -143,3 +143,8 @@ func GenRequestID() string {
 	timestamp := time.Now().UnixNano()
 	return fmt.Sprintf("%d.%d.%d", timestamp, pid, atomic.AddUint64(&seq, 1))
 }
+
+// Dup Dup
+func Dup(ctx context.Context) context.Context {
+	return WithLogger(context.TODO(), LoggerFromCtx(ctx))
+}
