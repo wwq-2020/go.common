@@ -246,3 +246,23 @@ func Code(err error) int {
 	}
 	return se.Code()
 }
+
+// Replace Replace
+func Replace(raw, err error) error {
+	se, ok := raw.(*stackError)
+	if !ok {
+		return err
+	}
+	se.err = err
+	return se
+}
+
+// ReplaceCode ReplaceCode
+func ReplaceCode(raw error, code int) error {
+	se, ok := raw.(*stackError)
+	if !ok {
+		return se
+	}
+	se.code = code
+	return se
+}
