@@ -1,9 +1,10 @@
 package log
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wwq-2020/go.common/errors"
@@ -15,7 +16,6 @@ import (
 
 // Logger Logger
 type Logger interface {
-	Rotate()
 	// Panic Panic
 	Panic(string)
 	// Panicf Panicf
@@ -40,6 +40,30 @@ type Logger interface {
 	Debug(string)
 	// Debugf Debugf
 	Debugf(string, ...interface{})
+	// PanicContext PanicContext
+	PanicContext(context.Context, string)
+	// PanicfContext PanicfContext
+	PanicfContext(context.Context, string, ...interface{})
+	// FatalContext FatalContext
+	FatalContext(context.Context, string)
+	// FatalfContext FatalfContext
+	FatalfContext(context.Context, string, ...interface{})
+	// ErrorContext ErrorContext
+	ErrorContext(context.Context, error)
+	// ErrorfContext ErrorfContext
+	ErrorfContext(context.Context, string, ...interface{})
+	// WarnContext WarnContext
+	WarnContext(context.Context, string)
+	// WarnfContext WarnfContext
+	WarnfContext(context.Context, string, ...interface{})
+	// InfoContext InfoContext
+	InfoContext(context.Context, string)
+	// InfofContext InfofContext
+	InfofContext(context.Context, string, ...interface{})
+	// DebugContext DebugContext
+	DebugContext(context.Context, string)
+	// DebugfContext DebugfContext
+	DebugfContext(context.Context, string, ...interface{})
 	// WithFields WithFields
 	WithFields(stack.Fields) Logger
 	// WithError WithError
@@ -50,10 +74,12 @@ type Logger interface {
 	WithZapFields(fields ...zap.Field) Logger
 	// SetLevel SetLevel
 	SetLevel(Level)
-	// Sync
+	// Sync Sync
 	Sync() error
-	// Close
-	Close() error
+	// Dup Dup
+	Dup() Logger
+	// AddDep AddDep
+	AddDep(int) Logger
 }
 
 // Fields Fields
@@ -81,8 +107,7 @@ const (
 
 // Entry Entry
 type logger struct {
-	l *zap.Logger
-	sync.RWMutex
+	l       *zap.Logger
 	depth   int
 	options *Options
 }
@@ -113,18 +138,6 @@ func SetOutput(output string) {
 	defaultOptions.output = output
 	std = NewEx(1)
 	stdWith = NewEx(0)
-}
-
-// SetOutput SetOutput
-func (l *logger) Rotate() {
-	prevOutput := l.options.output
-	l.Lock()
-	prev := l.l
-	prev.Sync()
-	os.Rename(prevOutput, prevOutput+".1")
-	zapLogger, _ := genZapConfig(l.options).Build()
-	l.l = zapLogger
-	l.Unlock()
 }
 
 // Std Std
@@ -188,6 +201,36 @@ var (
 	}
 )
 
+// Sync Sync
+func Sync() error {
+	if err := std.Sync(); err != nil {
+		return errors.Trace(err)
+	}
+	return nil
+}
+
+type loggerKey struct{}
+
+// LoggerFromContext LoggerFromContext
+func LoggerFromContext(ctx context.Context) Logger {
+	return loggerFromContext(ctx, 0)
+}
+
+func loggerFromContext(ctx context.Context, depth int) Logger {
+	loggerObj := ctx.Value(loggerKey{})
+	if loggerObj == nil {
+		return std
+	}
+	logger := loggerObj.(Logger)
+	logger = logger.AddDep(depth)
+	return logger
+}
+
+// ContextWithLogger ContextWithLogger
+func ContextWithLogger(ctx context.Context, logger Logger) context.Context {
+	return context.WithValue(ctx, loggerKey{}, logger)
+}
+
 // Infof Infof
 func Infof(msg string, args ...interface{}) {
 	std.Infof(msg, args...)
@@ -196,14 +239,6 @@ func Infof(msg string, args ...interface{}) {
 // Info Info
 func Info(msg string) {
 	std.Info(msg)
-}
-
-// Sync Sync
-func Sync() error {
-	if err := std.Sync(); err != nil {
-		return errors.Trace(err)
-	}
-	return nil
 }
 
 // Errorf Errorf
@@ -254,6 +289,66 @@ func Panicf(msg string, args ...interface{}) {
 // Panic Panic
 func Panic(msg string) {
 	std.Panic(msg)
+}
+
+// InfofContext InfofContext
+func InfofContext(ctx context.Context, msg string, args ...interface{}) {
+	loggerFromContext(ctx, 1).InfofContext(ctx, msg, args...)
+}
+
+// InfoContext InfoContext
+func InfoContext(ctx context.Context, msg string) {
+	loggerFromContext(ctx, 1).InfoContext(ctx, msg)
+}
+
+// ErrorfContext ErrorfContext
+func ErrorfContext(ctx context.Context, msg string, args ...interface{}) {
+	loggerFromContext(ctx, 1).ErrorfContext(ctx, msg, args...)
+}
+
+// ErrorContext ErrorContext
+func ErrorContext(ctx context.Context, err error) {
+	loggerFromContext(ctx, 1).ErrorContext(ctx, err)
+}
+
+// WarnfContext WarnfContext
+func WarnfContext(ctx context.Context, msg string, args ...interface{}) {
+	loggerFromContext(ctx, 1).WarnfContext(ctx, msg, args...)
+}
+
+// WarnContext WarnContext
+func WarnContext(ctx context.Context, msg string) {
+	loggerFromContext(ctx, 1).WarnContext(ctx, msg)
+}
+
+// DebugfContext DebugfContext
+func DebugfContext(ctx context.Context, msg string, args ...interface{}) {
+	loggerFromContext(ctx, 1).DebugfContext(ctx, msg, args...)
+}
+
+// DebugContext DebugContext
+func DebugContext(ctx context.Context, msg string) {
+	loggerFromContext(ctx, 1).DebugContext(ctx, msg)
+}
+
+// FatalfContext FatalfContext
+func FatalfContext(ctx context.Context, msg string, args ...interface{}) {
+	loggerFromContext(ctx, 1).FatalfContext(ctx, msg, args...)
+}
+
+// FatalContext FatalContext
+func FatalContext(ctx context.Context, msg string) {
+	loggerFromContext(ctx, 1).FatalContext(ctx, msg)
+}
+
+// PanicfContext PanicfContext
+func PanicfContext(ctx context.Context, msg string, args ...interface{}) {
+	loggerFromContext(ctx, 1).PanicfContext(ctx, msg, args...)
+}
+
+// PanicContext PanicContext
+func PanicContext(ctx context.Context, msg string) {
+	loggerFromContext(ctx, 1).PanicContext(ctx, msg)
 }
 
 // SetLevel SetLevel
@@ -311,9 +406,9 @@ func (l *logger) Errorf(msg string, args ...interface{}) {
 
 // Error Error
 func (l *logger) Error(err error) {
-	zapFields := extractZapFieldsFromError(err)
+	errFields := zapFieldsFromError(err)
 	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
-		With(zapFields...).
+		With(errFields...).
 		Error(err.Error())
 }
 
@@ -365,23 +460,102 @@ func (l *logger) Panic(msg string) {
 		Panic(msg)
 }
 
-func convToZapLevel(level Level) zap.AtomicLevel {
-	switch level {
-	case PanicLevel:
-		return zap.NewAtomicLevelAt(zapcore.PanicLevel)
-	case FatalLevel:
-		return zap.NewAtomicLevelAt(zapcore.FatalLevel)
-	case ErrorLevel:
-		return zap.NewAtomicLevelAt(zapcore.ErrorLevel)
-	case WarnLevel:
-		return zap.NewAtomicLevelAt(zapcore.WarnLevel)
-	case InfoLevel:
-		return zap.NewAtomicLevelAt(zapcore.InfoLevel)
-	case DebugLevel:
-		return zap.NewAtomicLevelAt(zapcore.DebugLevel)
-	default:
-		return zap.NewAtomicLevelAt(zapcore.InfoLevel)
-	}
+// InfofContext InfofContext
+func (l *logger) InfofContext(ctx context.Context, msg string, args ...interface{}) {
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		Info(fmt.Sprintf(msg, args...))
+}
+
+// InfoContext InfoContext
+func (l *logger) InfoContext(ctx context.Context, msg string) {
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		Info(msg)
+}
+
+// ErrorfContext ErrorfContext
+func (l *logger) ErrorfContext(ctx context.Context, msg string, args ...interface{}) {
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		Error(fmt.Sprintf(msg, args...))
+}
+
+// ErrorContext ErrorContext
+func (l *logger) ErrorContext(ctx context.Context, err error) {
+	errFields := zapFieldsFromError(err)
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		With(errFields...).
+		Error(err.Error())
+}
+
+// WarnfContext WarnfContext
+func (l *logger) WarnfContext(ctx context.Context, msg string, args ...interface{}) {
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		Warn(fmt.Sprintf(msg, args...))
+}
+
+// WarnContext WarnContext
+func (l *logger) WarnContext(ctx context.Context, msg string) {
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		Warn(msg)
+}
+
+// DebugfContext DebugfContext
+func (l *logger) DebugfContext(ctx context.Context, msg string, args ...interface{}) {
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		Debug(fmt.Sprintf(msg, args...))
+}
+
+// DebugContext DebugContext
+func (l *logger) DebugContext(ctx context.Context, msg string) {
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		Debug(msg)
+}
+
+// FatalfContext FatalfContext
+func (l *logger) FatalfContext(ctx context.Context, msg string, args ...interface{}) {
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		Fatal(fmt.Sprintf(msg, args...))
+}
+
+// FatalContext FatalContext
+func (l *logger) FatalContext(ctx context.Context, msg string) {
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		Fatal(msg)
+}
+
+// PanicfContext PanicfContext
+func (l *logger) PanicfContext(ctx context.Context, msg string, args ...interface{}) {
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		Panic(fmt.Sprintf(msg, args...))
+}
+
+// PanicContext PanicContext
+func (l *logger) PanicContext(ctx context.Context, msg string) {
+	ctxFields := zapFieldsFromContext(ctx)
+	l.l.With(ctxFields...).
+		With(zap.String("caller", stack.Caller(l.depth+1))).
+		Panic(msg)
 }
 
 // SetLevel SetLevel
@@ -406,34 +580,42 @@ func (l *logger) SetLevel(level Level) {
 
 // WithFields WithFields
 func (l *logger) WithFields(fields stack.Fields) Logger {
+	options := *l.options
 	return &logger{
-		l:     l.l.With(fields2ZapFields(fields)...),
-		depth: l.depth,
+		l:       l.l.With(fields2ZapFields(fields)...),
+		depth:   l.depth,
+		options: &options,
 	}
 }
 
 // WithFields WithFields
 func (l *logger) WithZapFields(fields ...zap.Field) Logger {
+	options := *l.options
 	return &logger{
-		l:     l.l.With(fields...),
-		depth: l.depth,
+		l:       l.l.With(fields...),
+		depth:   l.depth,
+		options: &options,
 	}
 }
 
 // WithError WithError
 func (l *logger) WithError(err error) Logger {
 	stack := errors.AllFields(err)
+	options := *l.options
 	return &logger{
-		l:     l.l.With(fields2ZapFields(stack)...),
-		depth: l.depth,
+		l:       l.l.With(fields2ZapFields(stack)...),
+		depth:   l.depth,
+		options: &options,
 	}
 }
 
 // WithField WithField
 func (l *logger) WithField(key string, val interface{}) Logger {
+	options := *l.options
 	return &logger{
-		l:     l.l.With(zap.Any(key, val)),
-		depth: l.depth,
+		l:       l.l.With(zap.Any(key, val)),
+		depth:   l.depth,
+		options: &options,
 	}
 }
 
@@ -441,40 +623,91 @@ func (l *logger) Sync() error {
 	return l.l.Sync()
 }
 
-func (l *logger) Close() error {
-	return nil
-
+func (l *logger) Dup() Logger {
+	options := *l.options
+	zapLogger := *l.l
+	return &logger{
+		l:       &zapLogger,
+		depth:   l.depth,
+		options: &options,
+	}
 }
 
-func extractZapFieldsFromError(err error) []zap.Field {
+func (l *logger) AddDep(depth int) Logger {
+	options := *l.options
+	zapLogger := *l.l
+	return &logger{
+		l:       &zapLogger,
+		depth:   l.depth + depth,
+		options: &options,
+	}
+}
+
+type traceInfoKey struct{}
+
+// ContextWithTraceID ContextWithTraceID
+func ContextWithTraceID(ctx context.Context, traceID string) context.Context {
+	return context.WithValue(ctx, traceInfoKey{}, traceID)
+}
+
+// ContextWithTraceIDWithFun ContextWithTraceIDWithFun
+func ContextWithTraceIDWithFun(ctx context.Context, fun func() string) context.Context {
+	return ContextWithTraceID(ctx, fun())
+}
+
+// ContextEnsureTraceID ContextEnsureTraceID
+func ContextEnsureTraceID(ctx context.Context) context.Context {
+	traceID := TraceIDFromContext(ctx)
+	if traceID == "" {
+		return ContextWithTraceIDWithFun(ctx, GenTraceID)
+	}
+	return ctx
+}
+
+// TraceIDFromContext TraceIDFromContext
+func TraceIDFromContext(ctx context.Context) string {
+	traceIDObj := ctx.Value(traceInfoKey{})
+	if traceIDObj == nil {
+		return ""
+	}
+	return traceIDObj.(string)
+}
+
+var (
+	seq uint64
+	pid = os.Getpid()
+)
+
+// GenTraceID GenTraceID
+func GenTraceID() string {
+	timestamp := time.Now().UnixNano()
+	return fmt.Sprintf("%d.%d.%d", timestamp, pid, atomic.AddUint64(&seq, 1))
+}
+
+// DupContext DupContext
+func DupContext(ctx context.Context) context.Context {
+	logger := LoggerFromContext(ctx)
+	traceID := TraceIDFromContext(ctx)
+	ctx = ContextWithLogger(context.TODO(), logger)
+	return ContextWithTraceID(ctx, traceID)
+}
+
+func zapFieldsFromContext(ctx context.Context) []zap.Field {
+	return []zap.Field{
+		zap.String("traceID", TraceIDFromContext(ctx)),
+	}
+}
+
+func zapFieldsFromError(err error) []zap.Field {
 	fields := errors.StackFields(err)
 	return fields2ZapFields(fields)
 }
 
 func fields2ZapFields(fields stack.Fields) []zap.Field {
 	kvs := fields.KVs()
-	zapFields := make([]zap.Field, 0, len(kvs)+1)
+	zapFields := make([]zap.Field, 0, len(kvs))
 	for k, v := range kvs {
 		zapFields = append(zapFields, zap.Any(k, v))
 	}
 	return zapFields
-}
-
-// String2Level String2Level
-func String2Level(level string) Level {
-	switch level {
-	case "debug":
-		return DebugLevel
-	case "info":
-		return InfoLevel
-	case "warn":
-		return WarnLevel
-	case "error":
-		return ErrorLevel
-	case "panic":
-		return PanicLevel
-	case "fatal":
-		return FatalLevel
-	}
-	return InfoLevel
 }
