@@ -44,6 +44,22 @@ func NewWithField(msg string, key string, val interface{}) error {
 	return trace(errors.New(msg), UnknownCode, fields)
 }
 
+// NewWithCode NewWithCode
+func NewWithCode(msg string, code int) error {
+	return trace(errors.New(msg), code, nil)
+}
+
+// NewWithCodeWithFields NewWithCodeWithFields
+func NewWithCodeWithFields(msg string, code int, fields stack.Fields) error {
+	return trace(errors.New(msg), code, fields)
+}
+
+// NewWithCodeWithField NewWithCodeWithField
+func NewWithCodeWithField(msg string, code int, key string, val interface{}) error {
+	fields := stack.New().Set(key, val)
+	return trace(errors.New(msg), code, fields)
+}
+
 // Trace Trace
 func Trace(err error) error {
 	if err == nil {
