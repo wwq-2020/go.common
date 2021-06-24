@@ -21,10 +21,14 @@ func New() Fields {
 }
 
 func (fs fields) Merge(fs2 Fields) Fields {
-	for k, v := range fs2.KVs() {
-		fs[k] = v
+	newFS := New()
+	for k, v := range fs.KVs() {
+		newFS.Set(k, v)
 	}
-	return fs
+	for k, v := range fs2.KVs() {
+		newFS.Set(k, v)
+	}
+	return newFS
 }
 
 func (fs fields) Set(key string, val interface{}) Fields {
