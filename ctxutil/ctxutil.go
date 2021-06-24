@@ -127,10 +127,24 @@ func EnsureRequestID(ctx context.Context) context.Context {
 
 type requestIDKey struct{}
 
+func withRequestID(ctx context.Context, requestID string) context.Context {
+	return context.WithValue(ctx, requestIDKey{}, requestID)
+}
+
 // EnsureRequestIDWithFun EnsureRequestIDWithFun
 func EnsureRequestIDWithFun(ctx context.Context, fn func() string) context.Context {
 	requestID := fn()
+	ctx = withRequestID(ctx, requestID)
 	return WithField(ctx, "requestID", requestID)
+}
+
+// RequestIDFromCtx RequestIDFromCtx
+func RequestIDFromCtx(ctx context.Context) string {
+	requestIDObj := ctx.Value(requestIDKey{})
+	if requestIDObj == nil {
+		return ""
+	}
+	return requestIDObj.(string)
 }
 
 var (
