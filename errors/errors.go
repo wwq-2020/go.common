@@ -273,7 +273,7 @@ func ReplaceCode(raw error, code int) error {
 func Tip(raw error) string {
 	se, ok := raw.(*stackError)
 	if !ok {
-		return ""
+		return raw.Error()
 	}
 	return se.tip
 }
@@ -282,7 +282,7 @@ func Tip(raw error) string {
 func ReplaceTip(raw error, tip string) error {
 	se, ok := raw.(*stackError)
 	if !ok {
-		return raw
+		return errors.New(tip)
 	}
 	se.tip = tip
 	return se
