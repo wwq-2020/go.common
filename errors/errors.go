@@ -270,7 +270,7 @@ func ReplaceCode(raw error, code int) error {
 }
 
 // Tip Tip
-func Tip(raw error, code int) string {
+func Tip(raw error) string {
 	se, ok := raw.(*stackError)
 	if !ok {
 		return ""
