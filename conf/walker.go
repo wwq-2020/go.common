@@ -8,7 +8,7 @@ import (
 
 // errs
 var (
-	ErrNotExist = errors.Std("not exist")
+	ErrKeyNil = errors.Std("key nil")
 )
 
 // Walker Walker

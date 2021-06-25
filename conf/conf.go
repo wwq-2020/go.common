@@ -59,7 +59,7 @@ func Parse(data []byte, dest interface{}) error {
 	walker := NewWalker(func(field *Field) error {
 		key := strings.Join(append(field.Ancestors, field.Field.Tag.Get("toml")), ".")
 		if !metadata.IsDefined(key) {
-			return errors.TraceWithField(ErrNotExist, key, strings.Join(append(field.Ancestors, field.Field.Name), "."))
+			return errors.TraceWithField(ErrKeyNil, key, strings.Join(append(field.Ancestors, field.Field.Name), "."))
 		}
 		return nil
 	})
