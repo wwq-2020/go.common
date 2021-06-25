@@ -17,6 +17,12 @@ import (
 // FileFormatter FileFormatter
 type FileFormatter func(string) string
 
+// WriteSyncCloser WriteSyncCloser
+type WriteSyncCloser interface {
+	io.WriteCloser
+	Sync() error
+}
+
 // RotateType RotateType
 type RotateType int
 
@@ -125,6 +131,15 @@ func (p *periodRotatedOutput) Close() error {
 	return nil
 }
 
+func (p *periodRotatedOutput) Sync() error {
+	p.Lock()
+	defer p.Unlock()
+	if err := p.output.Sync(); err != nil {
+		return errors.Trace(err)
+	}
+	return nil
+}
+
 type sizeRotatedOutput struct {
 	file   string
 	output *os.File
@@ -132,6 +147,15 @@ type sizeRotatedOutput struct {
 	bytes  uint64
 	sync.Mutex
 	fileFormatter FileFormatter
+}
+
+func (s *sizeRotatedOutput) Sync() error {
+	s.Lock()
+	defer s.Unlock()
+	if err := s.output.Sync(); err != nil {
+		return errors.Trace(err)
+	}
+	return nil
 }
 
 func (s *sizeRotatedOutput) Close() error {
@@ -175,7 +199,7 @@ func (s *sizeRotatedOutput) swapOutpout() {
 }
 
 // BuildRotatedOutput BuildRotatedOutput
-func BuildRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
+func BuildRotatedOutput(file string, rotateConf *RotateConf) WriteSyncCloser {
 	if rotateConf == nil {
 		f, err := os.OpenFile(file, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
@@ -195,7 +219,7 @@ func BuildRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
 }
 
 // BuildPeriodRotatedOutput BuildPeriodRotatedOutput
-func BuildPeriodRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
+func BuildPeriodRotatedOutput(file string, rotateConf *RotateConf) WriteSyncCloser {
 	d, err := time.ParseDuration(rotateConf.RotateArg)
 	if err != nil {
 		d, err = time.ParseDuration(defaultPeriodRotateArg)
@@ -238,7 +262,7 @@ func parseSize(arg string) uint64 {
 }
 
 // BuildSizeRotatedOutput BuildSizeRotatedOutput
-func BuildSizeRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
+func BuildSizeRotatedOutput(file string, rotateConf *RotateConf) WriteSyncCloser {
 	nextFile := rotateConf.FileFormatter(file)
 	f, err := os.OpenFile(nextFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
