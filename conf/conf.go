@@ -1,7 +1,9 @@
 package conf
 
 import (
+	"flag"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 
@@ -10,11 +12,25 @@ import (
 	"github.com/wwq-2020/go.common/log"
 )
 
+var (
+	flagger = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	cfgPath = flagger.String("conf", "conf.toml", "-conf=conf.toml")
+)
+
+func init() {
+	flagger.Parse(os.Args[1:])
+}
+
 // Field Field
 type Field struct {
 	Field     reflect.StructField
 	Value     reflect.Value
 	Ancestors []string
+}
+
+// MustLoad MustLoad
+func MustLoad(dest interface{}) {
+	MustParseFile(*cfgPath, dest)
 }
 
 // MustParseFile MustParseFile
