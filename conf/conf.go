@@ -7,6 +7,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/log"
 )
 
 // Field Field
@@ -14,6 +15,14 @@ type Field struct {
 	Field     reflect.StructField
 	Value     reflect.Value
 	Ancestors []string
+}
+
+// MustParseFile MustParseFile
+func MustParseFile(file string, dest interface{}) {
+	if err := ParseFile(file, dest); err != nil {
+		log.WithError(err).
+			Fatal("failed to ParseFile")
+	}
 }
 
 // ParseFile ParseFile
@@ -26,6 +35,14 @@ func ParseFile(file string, dest interface{}) error {
 		return errors.Trace(err)
 	}
 	return nil
+}
+
+// MustParse MustParse
+func MustParse(data []byte, dest interface{}) {
+	if err := Parse(data, dest); err != nil {
+		log.WithError(err).
+			Fatal("failed to Parse")
+	}
 }
 
 // Parse Parse
@@ -52,6 +69,14 @@ func Parse(data []byte, dest interface{}) error {
 	return nil
 }
 
+// MustParseBy MustParseBy
+func MustParseBy(data []byte, dest interface{}, decodeFunc DecodeFunc, walker Walker) {
+	if err := ParseBy(data, dest, decodeFunc, walker); err != nil {
+		log.WithError(err).
+			Fatal("failed to ParseBy")
+	}
+}
+
 // ParseBy ParseBy
 func ParseBy(data []byte, dest interface{}, decodeFunc DecodeFunc, walker Walker) error {
 	if err := decodeFunc(data, dest); err != nil {
@@ -61,6 +86,14 @@ func ParseBy(data []byte, dest interface{}, decodeFunc DecodeFunc, walker Walker
 		return errors.Trace(err)
 	}
 	return nil
+}
+
+// MustWalk MustWalk
+func MustWalk(dest interface{}, walker Walker) {
+	if err := Walk(dest, walker); err != nil {
+		log.WithError(err).
+			Fatal("failed to Walk")
+	}
 }
 
 // Walk Walk
