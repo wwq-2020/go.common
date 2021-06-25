@@ -3,9 +3,8 @@ package log
 import (
 	"context"
 	"fmt"
-	"log"
+	"io"
 	"os"
-	"sync/atomic"
 	"time"
 
 	"github.com/wwq-2020/go.common/errors"
@@ -81,6 +80,8 @@ type Logger interface {
 	Dup() Logger
 	// AddDep AddDep
 	AddDep(int) Logger
+	// Close Close
+	Close() error
 }
 
 // Fields Fields
@@ -111,6 +112,7 @@ type logger struct {
 	l       *zap.Logger
 	depth   int
 	options *Options
+	writer  zapcore.WriteSyncer
 }
 
 // New 初始化Logger
@@ -119,7 +121,7 @@ func New(opts ...Option) Logger {
 }
 
 // WithOutput WithOutput
-func WithOutput(output string) Option {
+func WithOutput(output io.WriteCloser) Option {
 	return func(o *Options) {
 		o.output = output
 	}
@@ -130,12 +132,12 @@ type Option func(*Options)
 
 // Options Options
 type Options struct {
-	output string
+	output io.WriteCloser
 	level  Level
 }
 
 // SetOutput SetOutput
-func SetOutput(output string) {
+func SetOutput(output io.WriteCloser) {
 	defaultOptions.output = output
 	std = NewEx(1)
 	stdWith = NewEx(0)
@@ -152,10 +154,8 @@ func NewEx(depth int, opts ...Option) Logger {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	zapLogger, err := genZapConfig(&options).Build()
-	if err != nil {
-		log.Fatalf("failed to Build,err:%#v", err)
-	}
+
+	zapLogger := buildZapLogger(&options)
 	return &logger{
 		options: &options,
 		depth:   depth,
@@ -163,39 +163,41 @@ func NewEx(depth int, opts ...Option) Logger {
 	}
 }
 
-func genZapConfig(options *Options) zap.Config {
-	return zap.Config{
-		Level:             zap.NewAtomicLevelAt(zap.InfoLevel),
-		DisableCaller:     true,
-		DisableStacktrace: true,
-		Development:       false,
-		Encoding:          "json",
-		EncoderConfig: zapcore.EncoderConfig{
-			TimeKey:       "ts",
-			LevelKey:      "level",
-			NameKey:       "logger",
-			CallerKey:     "caller",
-			MessageKey:    "msg",
-			StacktraceKey: "stacktrace",
-			LineEnding:    zapcore.DefaultLineEnding,
-			EncodeLevel:   zapcore.LowercaseLevelEncoder,
-			EncodeTime: func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-				time := t.Format("2006-01-02 15:04:05")
-				enc.AppendString(time)
-			},
-			EncodeDuration: zapcore.SecondsDurationEncoder,
-			EncodeCaller:   zapcore.ShortCallerEncoder,
+var (
+	zapEncoderConfig = zapcore.EncoderConfig{
+		TimeKey:       "ts",
+		LevelKey:      "level",
+		NameKey:       "logger",
+		CallerKey:     "caller",
+		MessageKey:    "msg",
+		StacktraceKey: "stacktrace",
+		LineEnding:    zapcore.DefaultLineEnding,
+		EncodeLevel:   zapcore.LowercaseLevelEncoder,
+		EncodeTime: func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+			time := t.Format("2006-01-02 15:04:05")
+			enc.AppendString(time)
 		},
-		OutputPaths:      []string{options.output},
-		ErrorOutputPaths: []string{options.output},
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
+)
+
+type zapLoggerOptions struct {
+	io.Writer
+	level zap.AtomicLevel
+}
+
+func buildZapLogger(options *Options) *zap.Logger {
+	encoder := zapcore.NewJSONEncoder(zapEncoderConfig)
+	core := zapcore.NewCore(encoder, zapcore.Lock(zapcore.AddSync(options.output)), options.level.toZapLevel())
+	return zap.New(core)
 }
 
 var (
 	std            = NewEx(1)
 	stdWith        = NewEx(0)
 	defaultOptions = Options{
-		output: "stdout",
+		output: os.Stdout,
 		level:  InfoLevel,
 	}
 )
@@ -206,6 +208,11 @@ func Sync() error {
 		return errors.Trace(err)
 	}
 	return nil
+}
+
+// Close Close
+func Close() {
+	std.Close()
 }
 
 type loggerKey struct{}
@@ -601,25 +608,8 @@ func (l *logger) PanicContext(ctx context.Context, msg string) {
 
 // SetLevel SetLevel
 func (l *logger) SetLevel(level Level) error {
-	cfg := genZapConfig(l.options)
-	switch level {
-	case PanicLevel:
-		cfg.Level = zap.NewAtomicLevelAt(zapcore.PanicLevel)
-	case FatalLevel:
-		cfg.Level = zap.NewAtomicLevelAt(zapcore.FatalLevel)
-	case ErrorLevel:
-		cfg.Level = zap.NewAtomicLevelAt(zapcore.ErrorLevel)
-	case WarnLevel:
-		cfg.Level = zap.NewAtomicLevelAt(zapcore.WarnLevel)
-	case InfoLevel:
-		cfg.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-	case DebugLevel:
-		cfg.Level = zap.NewAtomicLevelAt(zapcore.DebugLevel)
-	}
-	zapLogger, err := cfg.Build()
-	if err != nil {
-		return errors.Trace(err)
-	}
+	l.options.level = level
+	zapLogger := buildZapLogger(l.options)
 	l.l = zapLogger
 	return nil
 }
@@ -666,7 +656,17 @@ func (l *logger) WithField(key string, val interface{}) Logger {
 }
 
 func (l *logger) Sync() error {
-	return l.l.Sync()
+	if err := l.l.Sync(); err != nil {
+		return errors.Trace(err)
+	}
+	return nil
+}
+
+func (l *logger) Close() error {
+	if err := l.options.output.Close(); err != nil {
+		return errors.Trace(err)
+	}
+	return nil
 }
 
 func (l *logger) Dup() Logger {
@@ -687,73 +687,4 @@ func (l *logger) AddDep(depth int) Logger {
 		depth:   l.depth + depth,
 		options: &options,
 	}
-}
-
-type traceInfoKey struct{}
-
-// ContextWithTraceID ContextWithTraceID
-func ContextWithTraceID(ctx context.Context, traceID string) context.Context {
-	return context.WithValue(ctx, traceInfoKey{}, traceID)
-}
-
-// ContextWithTraceIDWithFun ContextWithTraceIDWithFun
-func ContextWithTraceIDWithFun(ctx context.Context, fun func() string) context.Context {
-	return ContextWithTraceID(ctx, fun())
-}
-
-// ContextEnsureTraceID ContextEnsureTraceID
-func ContextEnsureTraceID(ctx context.Context) context.Context {
-	traceID := TraceIDFromContext(ctx)
-	if traceID == "" {
-		return ContextWithTraceIDWithFun(ctx, GenTraceID)
-	}
-	return ctx
-}
-
-// TraceIDFromContext TraceIDFromContext
-func TraceIDFromContext(ctx context.Context) string {
-	traceIDObj := ctx.Value(traceInfoKey{})
-	if traceIDObj == nil {
-		return ""
-	}
-	return traceIDObj.(string)
-}
-
-var (
-	seq uint64
-	pid = os.Getpid()
-)
-
-// GenTraceID GenTraceID
-func GenTraceID() string {
-	timestamp := time.Now().UnixNano()
-	return fmt.Sprintf("%d.%d.%d", timestamp, pid, atomic.AddUint64(&seq, 1))
-}
-
-// DupContext DupContext
-func DupContext(ctx context.Context) context.Context {
-	logger := LoggerFromContext(ctx)
-	traceID := TraceIDFromContext(ctx)
-	ctx = ContextWithLogger(context.TODO(), logger)
-	return ContextWithTraceID(ctx, traceID)
-}
-
-func zapFieldsFromContext(ctx context.Context) []zap.Field {
-	return []zap.Field{
-		zap.String("traceID", TraceIDFromContext(ctx)),
-	}
-}
-
-func zapFieldsFromError(err error) []zap.Field {
-	fields := errors.StackFields(err)
-	return fields2ZapFields(fields)
-}
-
-func fields2ZapFields(fields stack.Fields) []zap.Field {
-	kvs := fields.KVs()
-	zapFields := make([]zap.Field, 0, len(kvs))
-	for k, v := range kvs {
-		zapFields = append(zapFields, zap.Any(k, v))
-	}
-	return zapFields
 }
