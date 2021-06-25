@@ -1,6 +1,8 @@
 package log
 
 import (
+	"strings"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -21,5 +23,24 @@ func (l Level) toZapLevel() zap.AtomicLevel {
 		return zap.NewAtomicLevelAt(zapcore.DebugLevel)
 	default:
 		return zap.NewAtomicLevelAt(zapcore.InfoLevel)
+	}
+}
+
+func parseStringLevel(level string) Level {
+	switch strings.ToLower(level) {
+	case "panic":
+		return PanicLevel
+	case "fatal":
+		return FatalLevel
+	case "error":
+		return ErrorLevel
+	case "warn":
+		return WarnLevel
+	case "info":
+		return InfoLevel
+	case "debug":
+		return DebugLevel
+	default:
+		return InfoLevel
 	}
 }

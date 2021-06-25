@@ -73,7 +73,9 @@ type Logger interface {
 	// WithZapFields WithZapFields
 	WithZapFields(fields ...zap.Field) Logger
 	// SetLevel SetLevel
-	SetLevel(Level) error
+	SetLevel(Level)
+	// SetStringLevel SetStringLevel
+	SetStringLevel(string)
 	// Sync Sync
 	Sync() error
 	// Dup Dup
@@ -141,6 +143,12 @@ func SetOutput(output io.WriteCloser) {
 	defaultOptions.output = output
 	std = NewEx(1)
 	stdWith = NewEx(0)
+}
+
+// SetLogger SetLogger
+func SetLogger(logger Logger) {
+	std = logger.AddDep(1)
+	stdWith = logger
 }
 
 // Std Std
@@ -358,8 +366,13 @@ func PanicContext(ctx context.Context, msg string) {
 }
 
 // SetLevel SetLevel
-func SetLevel(level Level) error {
-	return std.SetLevel(level)
+func SetLevel(level Level) {
+	std.SetLevel(level)
+}
+
+// SetStringLevel SetStringLevel
+func SetStringLevel(level string) {
+	std.SetStringLevel(level)
 }
 
 // WithFields WithFields
@@ -607,11 +620,19 @@ func (l *logger) PanicContext(ctx context.Context, msg string) {
 }
 
 // SetLevel SetLevel
-func (l *logger) SetLevel(level Level) error {
+func (l *logger) SetLevel(level Level) {
 	l.options.level = level
 	zapLogger := buildZapLogger(l.options)
 	l.l = zapLogger
-	return nil
+	return
+}
+
+// SetStringLevel SetStringLevel
+func (l *logger) SetStringLevel(level string) {
+	l.options.level = parseStringLevel(level)
+	zapLogger := buildZapLogger(l.options)
+	l.l = zapLogger
+	return
 }
 
 // WithFields WithFields

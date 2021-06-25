@@ -3,7 +3,6 @@ package log
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"regexp"
@@ -15,6 +14,9 @@ import (
 	"github.com/wwq-2020/go.common/errors"
 )
 
+// FileFormatter FileFormatter
+type FileFormatter func(string) string
+
 // RotateType RotateType
 type RotateType int
 
@@ -25,7 +27,6 @@ const (
 	defaultPeriodRotateArg         = "24h"
 	defaultSizeRotateArg           = "1gb"
 	defaultSizeRotateArgInt        = 1 << 30
-	logIndexFile                   = ".logindex"
 	b                       uint64 = 1
 	kb                      uint64 = 1 << 10
 	mb                      uint64 = 1 << 20
@@ -37,8 +38,9 @@ var (
 
 // RotateConf RotateConf
 type RotateConf struct {
-	RotateType RotateType
-	RotateArg  string
+	RotateType    RotateType
+	RotateArg     string
+	FileFormatter FileFormatter
 }
 
 func (rc *RotateConf) fill() {
@@ -53,6 +55,9 @@ func (rc *RotateConf) fill() {
 	if rc.RotateType == SizeRotateType &&
 		rc.RotateArg == "" {
 		rc.RotateArg = defaultSizeRotateArg
+	}
+	if rc.FileFormatter == nil {
+		rc.FileFormatter = defaultFileFormatter
 	}
 }
 
@@ -73,6 +78,7 @@ type periodRotatedOutput struct {
 	d      time.Duration
 	bytes  uint64
 	sync.Mutex
+	fileFormatter FileFormatter
 }
 
 func (p *periodRotatedOutput) run() {
@@ -85,7 +91,7 @@ func (p *periodRotatedOutput) run() {
 func (p *periodRotatedOutput) swapOutpout() {
 	p.Lock()
 	defer p.Unlock()
-	nextFile := getNextFile(p.file)
+	nextFile := p.fileFormatter(p.file)
 	f, err := os.OpenFile(nextFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
 		Error(err)
@@ -125,6 +131,7 @@ type sizeRotatedOutput struct {
 	size   uint64
 	bytes  uint64
 	sync.Mutex
+	fileFormatter FileFormatter
 }
 
 func (s *sizeRotatedOutput) Close() error {
@@ -151,7 +158,7 @@ func (s *sizeRotatedOutput) Write(b []byte) (int, error) {
 }
 
 func (s *sizeRotatedOutput) swapOutpout() {
-	nextFile := getNextFile(s.file)
+	nextFile := s.fileFormatter(s.file)
 	f, err := os.OpenFile(nextFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
 		Error(err)
@@ -194,12 +201,12 @@ func buildPeriodRotatedOutput(file string, rotateConf *RotateConf) io.WriteClose
 			Fatalf("failed to ParseDuration:%s,err:%v", defaultPeriodRotateArg, err)
 		}
 	}
-	nextFile := getNextFile(file)
+	nextFile := rotateConf.FileFormatter(file)
 	f, err := os.OpenFile(nextFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
 		Fatalf("failed to OpenFile:%s,err:%v", nextFile, err)
 	}
-	p := &periodRotatedOutput{file: file, output: f, d: d}
+	p := &periodRotatedOutput{file: file, output: f, d: d, fileFormatter: rotateConf.FileFormatter}
 	go p.run()
 	return p
 }
@@ -229,37 +236,18 @@ func parseSize(arg string) uint64 {
 }
 
 func buildSizeRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
-	nextFile := getNextFile(file)
+	nextFile := rotateConf.FileFormatter(file)
 	f, err := os.OpenFile(nextFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
 		Fatalf("failed to OpenFile:%s,err:%v", nextFile, err)
 	}
-	p := &sizeRotatedOutput{file: nextFile, output: f, size: parseSize(rotateConf.RotateArg)}
+	p := &sizeRotatedOutput{file: nextFile, output: f, size: parseSize(rotateConf.RotateArg), fileFormatter: rotateConf.FileFormatter}
 	return p
 }
 
-func getNextFile(file string) string {
+func defaultFileFormatter(file string) string {
 	dir := path.Dir(file)
-	id := getNextID(dir)
-	return fmt.Sprintf("%s.%d", file, id)
-}
-
-func getNextID(dir string) int64 {
-	file := path.Join(dir, logIndexFile)
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		if err := ioutil.WriteFile(file, []byte(strconv.FormatInt(0, 10)), 0666); err != nil {
-			return 0
-		}
-		return 0
-	}
-	id, err := strconv.ParseInt(string(data), 10, 64)
-	if err != nil {
-		return 0
-	}
-	nextID := id + 1
-	if err := ioutil.WriteFile(file, []byte(strconv.FormatInt(id+1, 10)), 0666); err != nil {
-		return id
-	}
-	return nextID
+	filename := path.Base(file)
+	filename = fmt.Sprintf("%s.%s", time.Now().Format("2006-01-02-15-04-05"), filename)
+	return path.Join(dir, filename)
 }
