@@ -68,7 +68,7 @@ func NewFileLog(file string) Logger {
 
 // NewFileLogEx NewFileLogEx
 func NewFileLogEx(file string, rotateConf *RotateConf) Logger {
-	output := buildRotatedOutput(file, rotateConf)
+	output := BuildRotatedOutput(file, rotateConf)
 	return New(WithOutput(output))
 }
 
@@ -174,7 +174,8 @@ func (s *sizeRotatedOutput) swapOutpout() {
 	s.bytes = 0
 }
 
-func buildRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
+// BuildRotatedOutput BuildRotatedOutput
+func BuildRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
 	if rotateConf == nil {
 		f, err := os.OpenFile(file, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
@@ -185,15 +186,16 @@ func buildRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
 	rotateConf.fill()
 	switch rotateConf.RotateType {
 	case PeriodRotateType:
-		return buildPeriodRotatedOutput(file, rotateConf)
+		return BuildPeriodRotatedOutput(file, rotateConf)
 	case SizeRotateType:
-		return buildSizeRotatedOutput(file, rotateConf)
+		return BuildSizeRotatedOutput(file, rotateConf)
 	default:
-		return buildPeriodRotatedOutput(file, rotateConf)
+		return BuildPeriodRotatedOutput(file, rotateConf)
 	}
 }
 
-func buildPeriodRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
+// BuildPeriodRotatedOutput BuildPeriodRotatedOutput
+func BuildPeriodRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
 	d, err := time.ParseDuration(rotateConf.RotateArg)
 	if err != nil {
 		d, err = time.ParseDuration(defaultPeriodRotateArg)
@@ -235,7 +237,8 @@ func parseSize(arg string) uint64 {
 	return num * unit
 }
 
-func buildSizeRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
+// BuildSizeRotatedOutput BuildSizeRotatedOutput
+func BuildSizeRotatedOutput(file string, rotateConf *RotateConf) io.WriteCloser {
 	nextFile := rotateConf.FileFormatter(file)
 	f, err := os.OpenFile(nextFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
