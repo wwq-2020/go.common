@@ -28,7 +28,7 @@ func LoggingReqInterceptor(httpReq *http.Request) error {
 	logger := log.ContextLoggerWithField(ctx, "method", httpReq.Method).
 		WithField("url", httpReq.URL.String())
 	if httpReq.Body != nil {
-		reqData, reqBody, err := drainBody(httpReq.Body)
+		reqData, reqBody, err := DrainBody(httpReq.Body)
 		if err != nil {
 			return errors.Trace(err)
 		}
@@ -80,7 +80,7 @@ func LoggingRespInterceptor(httpResp *http.Response) error {
 	ctx := httpResp.Request.Context()
 	logger := log.ContextLoggerWithField(ctx, "statuscode", httpResp.StatusCode)
 	if httpResp.Body != nil {
-		respData, respBody, err := drainBody(httpResp.Body)
+		respData, respBody, err := DrainBody(httpResp.Body)
 		if err != nil {
 			return errors.Trace(err)
 		}

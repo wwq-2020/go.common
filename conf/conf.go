@@ -73,56 +73,57 @@ func Parse(data []byte, dest interface{}) error {
 		return nil
 	}
 	walker := NewWalker(func(field *Field) error {
-		key := strings.Join(append(field.Ancestors, field.Field.Tag.Get("toml")), ".")
-		if !metadata.IsDefined(key) {
+		keys := append(field.Ancestors, field.Field.Tag.Get("toml"))
+		key := strings.Join(keys, ".")
+		if !metadata.IsDefined(keys...) {
 			return errors.TraceWithField(ErrKeyNil, key, strings.Join(append(field.Ancestors, field.Field.Name), "."))
 		}
 		return nil
 	})
-	if err := ParseBy(data, dest, decodeFunc, walker); err != nil {
+	if err := ParseBy(data, dest, "toml", decodeFunc, walker); err != nil {
 		return errors.Trace(err)
 	}
 	return nil
 }
 
 // MustParseBy MustParseBy
-func MustParseBy(data []byte, dest interface{}, decodeFunc DecodeFunc, walker Walker) {
-	if err := ParseBy(data, dest, decodeFunc, walker); err != nil {
+func MustParseBy(data []byte, dest interface{}, tag string, decodeFunc DecodeFunc, walker Walker) {
+	if err := ParseBy(data, dest, tag, decodeFunc, walker); err != nil {
 		log.WithError(err).
 			Fatal("failed to ParseBy")
 	}
 }
 
 // ParseBy ParseBy
-func ParseBy(data []byte, dest interface{}, decodeFunc DecodeFunc, walker Walker) error {
+func ParseBy(data []byte, dest interface{}, tag string, decodeFunc DecodeFunc, walker Walker) error {
 	if err := decodeFunc(data, dest); err != nil {
 		return errors.Trace(err)
 	}
-	if err := Walk(dest, walker); err != nil {
+	if err := Walk(dest, tag, walker); err != nil {
 		return errors.Trace(err)
 	}
 	return nil
 }
 
 // MustWalk MustWalk
-func MustWalk(dest interface{}, walker Walker) {
-	if err := Walk(dest, walker); err != nil {
+func MustWalk(dest interface{}, tag string, walker Walker) {
+	if err := Walk(dest, tag, walker); err != nil {
 		log.WithError(err).
 			Fatal("failed to Walk")
 	}
 }
 
 // Walk Walk
-func Walk(dest interface{}, walker Walker) error {
+func Walk(dest interface{}, tag string, walker Walker) error {
 	t := reflect.TypeOf(dest)
 	v := reflect.ValueOf(dest)
-	if err := walk(t, v, nil, walker); err != nil {
+	if err := walk(t, v, nil, tag, walker); err != nil {
 		return errors.Trace(err)
 	}
 	return nil
 }
 
-func walk(t reflect.Type, v reflect.Value, ancestors []string, walker Walker) error {
+func walk(t reflect.Type, v reflect.Value, ancestors []string, tag string, walker Walker) error {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
@@ -147,8 +148,8 @@ func walk(t reflect.Type, v reflect.Value, ancestors []string, walker Walker) er
 		if fieldType.Kind() != reflect.Struct {
 			continue
 		}
-		ancestors = append(ancestors, field.Name)
-		if err := walk(fieldType, fieldValue, ancestors, walker); err != nil {
+		ancestors = append(ancestors, field.Tag.Get(tag))
+		if err := walk(fieldType, fieldValue, ancestors, tag, walker); err != nil {
 			return errors.Trace(err)
 		}
 	}

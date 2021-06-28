@@ -11,6 +11,7 @@ import (
 
 	"github.com/wwq-2020/go.common/errors"
 	"github.com/wwq-2020/go.common/log"
+	"github.com/wwq-2020/go.common/stack"
 )
 
 // Get Get
@@ -39,55 +40,68 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 		opt(&options)
 	}
 
+	stack := stack.New().
+		Set("httpmethod", method).
+		Set("url", url)
 	var reqBody io.Reader
 	var reqData []byte
 	if req != nil {
 		var err error
 		reqData, err = options.codec.Encode(req)
 		if err != nil {
-			return errors.Trace(err)
+			return errors.TraceWithFields(err, stack)
 		}
+		stack.Set("reqData", string(reqData))
 		reqBody = bytes.NewReader(reqData)
 	}
 	httpReq, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
-		return errors.Trace(err)
+		return errors.TraceWithFields(err, stack)
 	}
 	ctx = log.ContextEnsureTraceID(ctx)
 	httpReq = httpReq.WithContext(ctx)
 	if options.reqInterceptor != nil {
 		if err := options.reqInterceptor(httpReq); err != nil {
-			return errors.Trace(err)
+			return errors.TraceWithFields(err, stack)
 		}
 	}
+	start := time.Now()
+	log.WithFields(stack).
+		InfoContext(ctx, "start invoke")
 
 	httpResp, err := options.client.Do(httpReq)
 	if err != nil {
-		return errors.Trace(err)
+		return errors.TraceWithFields(err, stack)
 	}
 
-	respData, respBody, err := drainBody(httpResp.Body)
+	respData, respBody, err := DrainBody(httpResp.Body)
 	if err != nil {
-		return errors.Trace(err)
+		return errors.TraceWithFields(err, stack)
 	}
-	defer httpResp.Body.Close()
-
+	elapsed := time.Now().Sub(start).Milliseconds()
+	stack.Set("respData", string(respData))
+	log.WithField("respData", string(respData)).
+		WithField("elapsed", elapsed).
+		InfoContext(ctx, "invoke finish")
 	httpResp.Body = respBody
+	defer httpResp.Body.Close()
 
 	if options.respInterceptor != nil {
 		if err := options.respInterceptor(httpResp); err != nil {
-			return errors.Trace(err)
+			return errors.TraceWithFields(err, stack)
 		}
 	}
 	if resp != nil {
 		if err := options.codec.Decode(respData, resp); err != nil {
-			return errors.Trace(err)
+			return errors.TraceWithFields(err, stack)
 		}
 	}
+
 	return nil
 }
 
-func drainBody(src io.ReadCloser) ([]byte, io.ReadCloser, error) {
+// DrainBody DrainBody
+func DrainBody(src io.ReadCloser) ([]byte, io.ReadCloser, error) {
 	defer src.Close()
 	var buf bytes.Buffer
 	if _, err := buf.ReadFrom(src); err != nil {
@@ -202,4 +216,17 @@ func RetriableClient() *http.Client {
 	return &http.Client{
 		Transport: RetriableTransport(maxRetry, Transport()),
 	}
+}
+
+// DefaultServer DefaultServer
+func DefaultServer(handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              "127.0.0.1:8080",
+		ReadTimeout:       time.Second * 5,
+		ReadHeaderTimeout: time.Second * 2,
+		WriteTimeout:      time.Second * 5,
+		IdleTimeout:       time.Second * 30,
+		MaxHeaderBytes:    1 << 20,
+	}
+
 }

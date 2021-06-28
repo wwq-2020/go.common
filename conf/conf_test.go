@@ -10,7 +10,7 @@ type conf struct {
 	A  int     `toml:"a"`
 	B  *string `toml:"b"`
 	XX struct {
-		C int `toml:"c" nullable:"true"`
+		C int `toml:"c" `
 	} `toml:"xx"`
 }
 
