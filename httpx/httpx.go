@@ -218,15 +218,69 @@ func RetriableClient() *http.Client {
 	}
 }
 
-// DefaultServer DefaultServer
-func DefaultServer(handler http.Handler) *http.Server {
-	return &http.Server{
-		Addr:              "127.0.0.1:8080",
-		ReadTimeout:       time.Second * 5,
-		ReadHeaderTimeout: time.Second * 2,
-		WriteTimeout:      time.Second * 5,
-		IdleTimeout:       time.Second * 30,
-		MaxHeaderBytes:    1 << 20,
-	}
+var (
+	defaultServerAddr              = "127.0.0.1:8080"
+	defaultServerReadTimeout       = time.Second * 5
+	defaultServerReadHeaderTimeout = time.Second * 2
+	defaultServerWriteTimeout      = time.Second * 5
+	defaultServerIdleTimeout       = time.Second * 30
+	defaultServerMaxHeaderBytes    = 1 << 20
+)
 
+// ServerConf ServerConf
+type ServerConf struct {
+	Addr              string
+	ReadTimeout       time.Duration
+	ReadHeaderTimeout time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
+	MaxHeaderBytes    int
+	Handler           http.Handler
+}
+
+func (s *ServerConf) fill() {
+	if s.Addr == "" {
+		s.Addr = defaultServerAddr
+	}
+	if s.ReadTimeout == 0 {
+		s.ReadTimeout = defaultServerReadTimeout
+	}
+	if s.ReadHeaderTimeout == 0 {
+		s.ReadHeaderTimeout = defaultServerReadHeaderTimeout
+	}
+	if s.WriteTimeout == 0 {
+		s.WriteTimeout = defaultServerWriteTimeout
+	}
+	if s.IdleTimeout == 0 {
+		s.IdleTimeout = defaultServerIdleTimeout
+	}
+	if s.MaxHeaderBytes == 0 {
+		s.MaxHeaderBytes = defaultServerMaxHeaderBytes
+	}
+}
+
+var defaultServerConf = &ServerConf{
+	Addr:              defaultServerAddr,
+	ReadTimeout:       defaultServerReadTimeout,
+	ReadHeaderTimeout: defaultServerReadHeaderTimeout,
+	WriteTimeout:      defaultServerWriteTimeout,
+	IdleTimeout:       defaultServerIdleTimeout,
+	MaxHeaderBytes:    defaultServerMaxHeaderBytes,
+}
+
+// HTTPServer HTTPServer
+func HTTPServer(conf *ServerConf) *http.Server {
+	if conf == nil {
+		conf = defaultServerConf
+	}
+	conf.fill()
+	return &http.Server{
+		Handler:           conf.Handler,
+		Addr:              conf.Addr,
+		ReadTimeout:       conf.ReadTimeout,
+		ReadHeaderTimeout: conf.ReadHeaderTimeout,
+		WriteTimeout:      conf.WriteTimeout,
+		IdleTimeout:       conf.IdleTimeout,
+		MaxHeaderBytes:    conf.MaxHeaderBytes,
+	}
 }

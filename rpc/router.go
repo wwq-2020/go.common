@@ -8,7 +8,8 @@ import (
 // Router Router
 type Router interface {
 	http.Handler
-	Handle(path string, handler http.Handler)
+	Handle(path string, handler http.Handler) Router
+	HandleNotFound(handler http.Handler) Router
 }
 
 // NewRouter NewRouter
@@ -24,11 +25,12 @@ type router struct {
 	NotFoundHandler http.Handler
 }
 
-func (r *router) Handle(path string, handler http.Handler) {
+func (r *router) Handle(path string, handler http.Handler) Router {
 	if _, ok := r.m[path]; ok {
 		panic(fmt.Sprintf("duplicate path register: %s", path))
 	}
 	r.m[path] = handler
+	return r
 }
 
 func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -43,4 +45,12 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	handler.ServeHTTP(w, req)
+}
+
+func (r *router) HandleNotFound(handler http.Handler) Router {
+	if handler == nil {
+		return r
+	}
+	r.NotFoundHandler = handler
+	return r
 }

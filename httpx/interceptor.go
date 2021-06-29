@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/wwq-2020/go.common/errors"
-	"github.com/wwq-2020/go.common/log"
 	"github.com/wwq-2020/go.common/stack"
 )
 
@@ -20,23 +19,6 @@ func ContentTypeReqInterceptor(contentType string) ReqInterceptor {
 		httpReq.Header.Set(ContentTypeHeader, contentType)
 		return nil
 	}
-}
-
-// LoggingReqInterceptor LoggingReqInterceptor
-func LoggingReqInterceptor(httpReq *http.Request) error {
-	ctx := httpReq.Context()
-	logger := log.ContextLoggerWithField(ctx, "method", httpReq.Method).
-		WithField("url", httpReq.URL.String())
-	if httpReq.Body != nil {
-		reqData, reqBody, err := DrainBody(httpReq.Body)
-		if err != nil {
-			return errors.Trace(err)
-		}
-		httpReq.Body = reqBody
-		logger = logger.WithField("reqData", string(reqData))
-	}
-	logger.InfoContext(ctx, "do http req")
-	return nil
 }
 
 // ChainedReqInterceptor ChainedReqInterceptor
@@ -73,22 +55,6 @@ func StatusCodeRangeRespInterceptor(codeStart, codeEnd int) RespInterceptor {
 		}
 		return nil
 	}
-}
-
-// LoggingRespInterceptor LoggingRespInterceptor
-func LoggingRespInterceptor(httpResp *http.Response) error {
-	ctx := httpResp.Request.Context()
-	logger := log.ContextLoggerWithField(ctx, "statuscode", httpResp.StatusCode)
-	if httpResp.Body != nil {
-		respData, respBody, err := DrainBody(httpResp.Body)
-		if err != nil {
-			return errors.Trace(err)
-		}
-		logger = logger.WithField("respData", string(respData))
-		httpResp.Body = respBody
-	}
-	logger.InfoContext(ctx, "got http resp")
-	return nil
 }
 
 // ChainedRespInterceptor ChainedRespInterceptor

@@ -30,7 +30,18 @@ type Field struct {
 
 // MustLoad MustLoad
 func MustLoad(dest interface{}) {
-	MustParseFile(*cfgPath, dest)
+	if err := Load(dest); err != nil {
+		log.WithError(err).
+			Fatal("failed to Load")
+	}
+}
+
+// Load Load
+func Load(dest interface{}) error {
+	if err := ParseFile(*cfgPath, dest); err != nil {
+		return errors.Trace(err)
+	}
+	return nil
 }
 
 // MustParseFile MustParseFile

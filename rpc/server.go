@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/wwq-2020/go.common/errors"
 	"github.com/wwq-2020/go.common/httpx"
 	"github.com/wwq-2020/go.common/log"
+	"github.com/wwq-2020/go.common/rpc/middleware"
 	"google.golang.org/grpc"
 )
 
@@ -23,12 +25,13 @@ type ServerOption func(*ServerOptions)
 
 // ServerOptions ServerOptions
 type ServerOptions struct {
-	httpServer *http.Server
-	router     Router
+	httpServer  *http.Server
+	router      Router
+	interceptor grpc.UnaryServerInterceptor
 }
 
 var defaultServerOptions = ServerOptions{
-	httpServer: httpx.DefaultServer(nil),
+	httpServer: httpx.HTTPServer(nil),
 	router:     NewRouter(),
 }
 
@@ -36,6 +39,13 @@ var defaultServerOptions = ServerOptions{
 func WithHTTPServer(httpServer *http.Server) ServerOption {
 	return func(o *ServerOptions) {
 		o.httpServer = httpServer
+	}
+}
+
+// WithServerInterceptors WithServerInterceptors
+func WithServerInterceptors(interceptors ...grpc.UnaryServerInterceptor) ServerOption {
+	return func(o *ServerOptions) {
+		o.interceptor = middleware.ChainServerInerceptor(interceptors...)
 	}
 }
 
@@ -47,8 +57,7 @@ type Server interface {
 }
 
 type server struct {
-	httpServer *http.Server
-	router     Router
+	options *ServerOptions
 }
 
 // NewServer NewServer
@@ -57,15 +66,15 @@ func NewServer(opts ...ServerOption) Server {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	options.httpServer.Handler = options.router
+	options.httpServer.Handler = options.router.HandleNotFound(options.httpServer.Handler)
 	return &server{
-		httpServer: options.httpServer,
-		router:     options.router,
+		options: &options,
 	}
 }
 
 func (s *server) ListenAndServe() error {
-	if err := s.httpServer.ListenAndServe(); err != nil &&
+	s.options.httpServer.Handler = s.options.router
+	if err := s.options.httpServer.ListenAndServe(); err != nil &&
 		err != http.ErrServerClosed {
 		return errors.Trace(err)
 	}
@@ -73,7 +82,7 @@ func (s *server) ListenAndServe() error {
 }
 
 func (s *server) Stop(ctx context.Context) error {
-	if err := s.httpServer.Shutdown(ctx); err != nil {
+	if err := s.options.httpServer.Shutdown(ctx); err != nil {
 		return errors.Trace(err)
 	}
 	return nil
@@ -86,7 +95,7 @@ func (s *server) RegisterService(sd *grpc.ServiceDesc, ss interface{}) {
 func (s *server) registerHTTPService(sd *grpc.ServiceDesc, ss interface{}) {
 	for _, method := range sd.Methods {
 		httpMethod := "/" + sd.ServiceName + "/" + method.MethodName
-		s.router.Handle(httpMethod, &httpMethodHandler{
+		s.options.router.Handle(httpMethod, &httpMethodHandler{
 			server:  s,
 			service: ss,
 			handler: methodHandler(method.Handler),
@@ -97,13 +106,15 @@ func (s *server) registerHTTPService(sd *grpc.ServiceDesc, ss interface{}) {
 type methodHandler func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error)
 
 type httpMethodHandler struct {
-	server  Server
+	server  *server
 	service interface{}
 	handler methodHandler
 }
 
 func (h *httpMethodHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
+	ctx = log.ContextEnsureTraceID(ctx)
+	req = req.WithContext(ctx)
 	reqData, reqBody, err := httpx.DrainBody(req.Body)
 	if err != nil {
 		log.ErrorContext(ctx, err)
@@ -118,11 +129,13 @@ func (h *httpMethodHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) 
 	start := time.Now()
 
 	reqDec := requestDecoder(ctx, req.Body)
-	resp, err := h.handler(h.service, ctx, reqDec, nil)
+	resp, err := h.handler(h.service, ctx, reqDec, h.server.options.interceptor)
 	if err != nil {
 		log.ErrorContext(ctx, err)
-		w.WriteHeader(errors.Code(err))
-		io.WriteString(w, err.Error())
+		code := errors.Code(err)
+		w.Header().Add("rpccode", strconv.Itoa(code))
+		w.Header().Add("rpcmsg", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	elapsed := time.Now().Sub(start).Milliseconds()

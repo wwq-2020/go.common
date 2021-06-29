@@ -2,9 +2,9 @@ package rpc
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/wwq-2020/go.common/app"
-	"github.com/wwq-2020/go.common/conf"
 	"github.com/wwq-2020/go.common/httpx"
 	"github.com/wwq-2020/go.common/log"
 	"google.golang.org/grpc"
@@ -12,19 +12,17 @@ import (
 
 // Conf Conf
 type Conf struct {
-	Server *ServerConf `toml:"server"`
-}
-
-// ServerConf ServerConf
-type ServerConf struct {
-	Addr string `toml:"addr"`
+	Addr    string
+	Handler http.Handler
 }
 
 // ListenAndServe ListenAndServe
-func ListenAndServe(sd *grpc.ServiceDesc, ss interface{}) {
-	config := &Conf{}
-	conf.MustLoad(config)
-	httpServer := httpx.DefaultServer(nil)
+func ListenAndServe(sd *grpc.ServiceDesc, ss interface{}, conf *Conf) {
+	var serverConf *httpx.ServerConf
+	if conf != nil {
+		serverConf = &httpx.ServerConf{Addr: conf.Addr, Handler: conf.Handler}
+	}
+	httpServer := httpx.HTTPServer(serverConf)
 	server := NewServer(WithHTTPServer(httpServer))
 	server.RegisterService(sd, ss)
 	app.AddShutdownHook(func() {
