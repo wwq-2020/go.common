@@ -19,11 +19,14 @@ type Conf struct {
 func ListenAndServe(sd *grpc.ServiceDesc, ss interface{}, opts ...ServerOption) {
 	server := NewServer(opts...)
 	server.RegisterService(sd, ss)
+	app.GoAsync(func() {
+		if err := server.ListenAndServe(); err != nil {
+			log.WithError(err).
+				Fatal("failed to ListenAndServe")
+		}
+	})
 	app.AddShutdownHook(func() {
 		server.Stop(context.TODO())
 	})
-	if err := server.ListenAndServe(); err != nil {
-		log.WithError(err).
-			Fatal("failed to ListenAndServe")
-	}
+	app.Wait()
 }
