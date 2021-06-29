@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/wwq-2020/go.common/app"
-	"github.com/wwq-2020/go.common/httpx"
 	"github.com/wwq-2020/go.common/log"
 	"google.golang.org/grpc"
 )
@@ -17,13 +16,8 @@ type Conf struct {
 }
 
 // ListenAndServe ListenAndServe
-func ListenAndServe(sd *grpc.ServiceDesc, ss interface{}, conf *Conf) {
-	var serverConf *httpx.ServerConf
-	if conf != nil {
-		serverConf = &httpx.ServerConf{Addr: conf.Addr, Handler: conf.Handler}
-	}
-	httpServer := httpx.HTTPServer(serverConf)
-	server := NewServer(WithHTTPServer(httpServer))
+func ListenAndServe(sd *grpc.ServiceDesc, ss interface{}, opts ...ServerOption) {
+	server := NewServer(opts...)
 	server.RegisterService(sd, ss)
 	app.AddShutdownHook(func() {
 		server.Stop(context.TODO())
