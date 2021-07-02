@@ -7,10 +7,12 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/wwq-2020/go.common/errors"
 	"github.com/wwq-2020/go.common/log"
+	"github.com/wwq-2020/go.common/syncx"
 	"github.com/wwq-2020/go.common/util"
 )
 
@@ -308,4 +310,29 @@ func Transport(transportConf *TransportConf) http.RoundTripper {
 		maxRetry:   *transportConf.MaxRetry,
 		retryCheck: transportConf.RetryCheck,
 	}
+}
+
+type changableTransport struct {
+	rt atomic.Value
+}
+
+func (crt *changableTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := crt.rt.Load().(http.RoundTripper).RoundTrip(req)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	return resp, nil
+}
+
+// ChangableTransport ChangableTransport
+func ChangableTransport(ctx context.Context, ch chan struct{}, getter func() *TransportConf) http.RoundTripper {
+	crt := &changableTransport{}
+	callback := func() {
+		transportConf := getter()
+		rt := Transport(transportConf)
+		crt.rt.Store(rt)
+	}
+	callback()
+	syncx.SubscribeChans(ctx, ch, callback)
+	return crt
 }
