@@ -11,12 +11,13 @@ func DefaultClient() *http.Client {
 
 // ClientConf ClientConf
 type ClientConf struct {
-	TransportConf *TransportConf
-	MaxRetry      int
+	TransportConf *TransportConf `toml:"transport" yaml:"transport" json:"transport"`
 }
 
 var (
-	defaultClientConf = &ClientConf{}
+	defaultClientConf = &ClientConf{
+		TransportConf: defaultTransportConf,
+	}
 )
 
 func (c *ClientConf) fill() {

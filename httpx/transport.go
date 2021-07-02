@@ -100,21 +100,21 @@ var defaultTransportOptions = TransportOptions{
 
 // TransportConf TransportConf
 type TransportConf struct {
-	MaxRetry               *int    `toml:"max_retry" json:"max_retry"`
-	DialTimeout            *string `toml:"dial_timeout" json:"dial_timeout"`
-	KeepAlive              *string `toml:"keepalive" json:"keepalive"`
-	DisableKeepAlives      *bool   `toml:"disable_keep_alives" json:"disable_keep_alives"`
-	DisableCompression     *bool   `toml:"disable_compression" json:"disable_compression"`
-	MaxIdleConns           *int    `toml:"max_idle_conns" json:"max_idle_conns"`
-	MaxIdleConnsPerHost    *int    `toml:"max_idle_conns_per_host" json:"max_idle_conns_per_host"`
-	MaxConnsPerHost        *int    `toml:"max_conns_per_host" json:"max_conns_per_host"`
-	IdleConnTimeout        *string `toml:"idle_conn_timeout" json:"idle_conn_timeout"`
-	ResponseHeaderTimeout  *string `toml:"response_header_timeout" json:"response_header_timeout"`
-	ExpectContinueTimeout  *string `toml:"expect_continue_timeout" json:"expect_continue_timeout"`
-	MaxResponseHeaderBytes *string `toml:"max_response_header_bytes" json:"max_response_header_bytes"`
-	WriteBufferSize        *string `toml:"write_buffer_size" json:"write_buffer_size"`
-	ReadBufferSize         *string `toml:"read_buffer_size" json:"read_buffer_size"`
-	ForceAttemptHTTP2      *bool   `toml:"force_attempt_http2" json:"force_attempt_http2"`
+	MaxRetry               *int    `toml:"max_retry" yaml:"max_retry" json:"max_retry"`
+	DialTimeout            *string `toml:"dial_timeout" yaml:"dial_timeout" json:"dial_timeout"`
+	KeepAlive              *string `toml:"keepalive" yaml:"keepalive" json:"keepalive"`
+	DisableKeepAlives      *bool   `toml:"disable_keep_alives" yaml:"disable_keep_alives" json:"disable_keep_alives"`
+	DisableCompression     *bool   `toml:"disable_compression" yaml:"disable_compression" json:"disable_compression"`
+	MaxIdleConns           *int    `toml:"max_idle_conns" yaml:"max_idle_conns" json:"max_idle_conns"`
+	MaxIdleConnsPerHost    *int    `toml:"max_idle_conns_per_host" yaml:"max_idle_conns_per_host" json:"max_idle_conns_per_host"`
+	MaxConnsPerHost        *int    `toml:"max_conns_per_host" yaml:"max_conns_per_host" json:"max_conns_per_host"`
+	IdleConnTimeout        *string `toml:"idle_conn_timeout" yaml:"idle_conn_timeout" json:"idle_conn_timeout"`
+	ResponseHeaderTimeout  *string `toml:"response_header_timeout" yaml:"response_header_timeout" json:"response_header_timeout"`
+	ExpectContinueTimeout  *string `toml:"expect_continue_timeout" yaml:"expect_continue_timeout" json:"expect_continue_timeout"`
+	MaxResponseHeaderBytes *string `toml:"max_response_header_bytes" yaml:"max_response_header_bytes" json:"max_response_header_bytes"`
+	WriteBufferSize        *string `toml:"write_buffer_size" yaml:"write_buffer_size" json:"write_buffer_size"`
+	ReadBufferSize         *string `toml:"read_buffer_size" yaml:"read_buffer_size" json:"read_buffer_size"`
+	ForceAttemptHTTP2      *bool   `toml:"force_attempt_http2" yaml:"force_attempt_http2" json:"force_attempt_http2"`
 	RetryCheck             RetryCheck
 }
 
@@ -212,39 +212,35 @@ func Transport(transportConf *TransportConf) http.RoundTripper {
 			}
 			return conn, nil
 		},
-		DisableKeepAlives:      DefaultDisableKeepAlives,
-		DisableCompression:     DefaultDisableCompression,
-		MaxIdleConns:           DefaultMaxIdleConns,
-		MaxIdleConnsPerHost:    DefaultMaxIdleConnsPerHost,
-		MaxConnsPerHost:        DefaultMaxConnsPerHost,
+		DisableKeepAlives:      *transportConf.DisableKeepAlives,
+		DisableCompression:     *transportConf.DisableCompression,
+		MaxIdleConns:           *transportConf.MaxIdleConns,
+		MaxIdleConnsPerHost:    *transportConf.MaxIdleConnsPerHost,
+		MaxConnsPerHost:        *transportConf.MaxConnsPerHost,
 		IdleConnTimeout:        DefaultIdleConnTimeout,
 		ResponseHeaderTimeout:  DefaultResponseHeaderTimeout,
 		ExpectContinueTimeout:  DefaultExpectContinueTimeout,
 		MaxResponseHeaderBytes: DefaultMaxResponseHeaderBytes,
 		WriteBufferSize:        DefaultWriteBufferSize,
 		ReadBufferSize:         DefaultReadBufferSize,
-		ForceAttemptHTTP2:      DefaultForceAttemptHTTP2,
+		ForceAttemptHTTP2:      *transportConf.ForceAttemptHTTP2,
 	}
 
-	if transportConf.DialTimeout != nil {
-		dialTimeout, err := time.ParseDuration(*transportConf.DialTimeout)
-		if err == nil && dialTimeout != 0 {
-			dialer.Timeout = dialTimeout
-		}
-		if err != nil {
-			log.WithField("dial_timeout", transportConf.DialTimeout).
-				Error(err)
-		}
+	dialTimeout, err := time.ParseDuration(*transportConf.DialTimeout)
+	if err == nil && dialTimeout != 0 {
+		dialer.Timeout = dialTimeout
 	}
-	if transportConf.KeepAlive != nil {
-		keepAlive, err := time.ParseDuration(*transportConf.KeepAlive)
-		if err == nil && keepAlive != 0 {
-			dialer.KeepAlive = keepAlive
-		}
-		if err != nil {
-			log.WithField("keepalive", transportConf.KeepAlive).
-				Error(err)
-		}
+	if err != nil {
+		log.WithField("dial_timeout", transportConf.DialTimeout).
+			Error(err)
+	}
+	keepAlive, err := time.ParseDuration(*transportConf.KeepAlive)
+	if err == nil && keepAlive != 0 {
+		dialer.KeepAlive = keepAlive
+	}
+	if err != nil {
+		log.WithField("keepalive", transportConf.KeepAlive).
+			Error(err)
 	}
 	rt.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		log.WithField("network", network).
@@ -257,88 +253,56 @@ func Transport(transportConf *TransportConf) http.RoundTripper {
 		return conn, nil
 	}
 
-	if transportConf.DisableKeepAlives != nil {
-		rt.DisableKeepAlives = *transportConf.DisableKeepAlives
+	idleConnTimeout, err := time.ParseDuration(*transportConf.IdleConnTimeout)
+	if err == nil && idleConnTimeout != 0 {
+		rt.IdleConnTimeout = idleConnTimeout
 	}
-	if transportConf.DisableCompression != nil {
-		rt.DisableCompression = *transportConf.DisableCompression
+	if err != nil {
+		log.WithField("idle_conn_timeout", transportConf.IdleConnTimeout).
+			Error(err)
 	}
-	if transportConf.MaxIdleConns != nil && *transportConf.MaxIdleConns != 0 {
-		rt.MaxIdleConns = *transportConf.MaxIdleConns
+	responseHeaderTimeout, err := time.ParseDuration(*transportConf.ResponseHeaderTimeout)
+	if err == nil && responseHeaderTimeout != 0 {
+		rt.ResponseHeaderTimeout = responseHeaderTimeout
 	}
-	if transportConf.MaxIdleConnsPerHost != nil && *transportConf.MaxIdleConnsPerHost != 0 {
-		rt.MaxConnsPerHost = *transportConf.MaxIdleConnsPerHost
+	if err != nil {
+		log.WithField("response_header_timeout", transportConf.ResponseHeaderTimeout).
+			Error(err)
 	}
-	if transportConf.MaxConnsPerHost != nil && *transportConf.MaxConnsPerHost != 0 {
-		rt.MaxConnsPerHost = *transportConf.MaxConnsPerHost
+	expectContinueTimeout, err := time.ParseDuration(*transportConf.ExpectContinueTimeout)
+	if err == nil && expectContinueTimeout != 0 {
+		rt.ExpectContinueTimeout = expectContinueTimeout
 	}
-
-	if transportConf.IdleConnTimeout != nil {
-		idleConnTimeout, err := time.ParseDuration(*transportConf.IdleConnTimeout)
-		if err == nil && idleConnTimeout != 0 {
-			rt.IdleConnTimeout = idleConnTimeout
-		}
-		if err != nil {
-			log.WithField("idle_conn_timeout", transportConf.IdleConnTimeout).
-				Error(err)
-		}
+	if err != nil {
+		log.WithField("expect_continue_timeout", transportConf.ExpectContinueTimeout).
+			Error(err)
 	}
-	if transportConf.ResponseHeaderTimeout != nil {
-		responseHeaderTimeout, err := time.ParseDuration(*transportConf.ResponseHeaderTimeout)
-		if err == nil && responseHeaderTimeout != 0 {
-			rt.ResponseHeaderTimeout = responseHeaderTimeout
-		}
-		if err != nil {
-			log.WithField("response_header_timeout", transportConf.ResponseHeaderTimeout).
-				Error(err)
-		}
+	maxResponseHeaderBytes, err := util.ParseByteStr(*transportConf.MaxResponseHeaderBytes)
+	if err == nil && maxResponseHeaderBytes != 0 {
+		rt.MaxResponseHeaderBytes = maxResponseHeaderBytes
 	}
-	if transportConf.ExpectContinueTimeout != nil {
-		expectContinueTimeout, err := time.ParseDuration(*transportConf.ExpectContinueTimeout)
-		if err == nil && expectContinueTimeout != 0 {
-			rt.ExpectContinueTimeout = expectContinueTimeout
-		}
-		if err != nil {
-			log.WithField("expect_continue_timeout", transportConf.ExpectContinueTimeout).
-				Error(err)
-		}
+	if err != nil {
+		log.WithField("max_response_header_bytes", transportConf.MaxResponseHeaderBytes).
+			Error(err)
 	}
-	if transportConf.MaxResponseHeaderBytes != nil {
-		maxResponseHeaderBytes, err := util.ParseByteStr(*transportConf.MaxResponseHeaderBytes)
-		if err == nil && maxResponseHeaderBytes != 0 {
-			rt.MaxResponseHeaderBytes = maxResponseHeaderBytes
-		}
-		if err != nil {
-			log.WithField("max_response_header_bytes", transportConf.MaxResponseHeaderBytes).
-				Error(err)
-		}
+	writeBufferSize, err := util.ParseByteStr(*transportConf.WriteBufferSize)
+	if err == nil && writeBufferSize != 0 {
+		rt.WriteBufferSize = int(writeBufferSize)
+	}
+	if err != nil {
+		log.WithField("write_buffer_size", transportConf.WriteBufferSize).
+			Error(err)
 	}
 
-	if transportConf.WriteBufferSize != nil {
-		writeBufferSize, err := util.ParseByteStr(*transportConf.WriteBufferSize)
-		if err == nil && writeBufferSize != 0 {
-			rt.WriteBufferSize = int(writeBufferSize)
-		}
-		if err != nil {
-			log.WithField("write_buffer_size", transportConf.WriteBufferSize).
-				Error(err)
-		}
+	readBufferSize, err := util.ParseByteStr(*transportConf.ReadBufferSize)
+	if err == nil && readBufferSize != 0 {
+		rt.ReadBufferSize = int(readBufferSize)
+	}
+	if err != nil {
+		log.WithField("read_buffer_size", transportConf.ReadBufferSize).
+			Error(err)
 	}
 
-	if transportConf.ReadBufferSize != nil {
-		readBufferSize, err := util.ParseByteStr(*transportConf.ReadBufferSize)
-		if err == nil && readBufferSize != 0 {
-			rt.ReadBufferSize = int(readBufferSize)
-		}
-		if err != nil {
-			log.WithField("read_buffer_size", transportConf.ReadBufferSize).
-				Error(err)
-		}
-	}
-
-	if transportConf.ForceAttemptHTTP2 != nil {
-		rt.ForceAttemptHTTP2 = *transportConf.ForceAttemptHTTP2
-	}
 	return &retriableTransport{
 		rt:         rt,
 		maxRetry:   *transportConf.MaxRetry,

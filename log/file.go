@@ -24,18 +24,18 @@ type WriteSyncCloser interface {
 }
 
 // RotateType RotateType
-type RotateType int
+type RotateType string
 
 // RotateTypes
 const (
-	PeriodRotateType RotateType = iota
-	SizeRotateType
-	defaultPeriodRotateArg         = "24h"
-	defaultSizeRotateArg           = "1gb"
-	defaultSizeRotateArgInt        = 1 << 30
-	b                       uint64 = 1
-	kb                      uint64 = 1 << 10
-	mb                      uint64 = 1 << 20
+	PeriodRotateType        RotateType = "period"
+	SizeRotateType          RotateType = "size"
+	defaultPeriodRotateArg             = "24h"
+	defaultSizeRotateArg               = "1gb"
+	defaultSizeRotateArgInt            = 1 << 30
+	b                       uint64     = 1
+	kb                      uint64     = 1 << 10
+	mb                      uint64     = 1 << 20
 )
 
 var (
@@ -44,8 +44,8 @@ var (
 
 // RotateConf RotateConf
 type RotateConf struct {
-	RotateType    RotateType
-	RotateArg     string
+	RotateType    RotateType `toml:"rotate_type" yaml:"rotate_type" json:"rotate_type"`
+	RotateArg     string     `toml:"rotate_arg" yaml:"rotate_arg" json:"rotate_arg"`
 	FileFormatter FileFormatter
 }
 
