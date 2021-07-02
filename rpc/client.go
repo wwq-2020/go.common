@@ -27,7 +27,7 @@ func WithHTTPClient(httpClient *http.Client) ClientOption {
 }
 
 var defaultClientOptions = ClientOptions{
-	httpClient: httpx.RetriableClient(),
+	httpClient: httpx.DefaultClient(),
 }
 
 // Client Client

@@ -31,7 +31,7 @@ type ServerOptions struct {
 }
 
 var defaultServerOptions = ServerOptions{
-	httpServer: httpx.HTTPServer(nil),
+	httpServer: httpx.Server(nil),
 	router:     NewRouter(),
 }
 
