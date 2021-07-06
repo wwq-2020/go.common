@@ -84,3 +84,8 @@ func stackfilter(src string) bool {
 func StdFilter(src string) bool {
 	return strings.Contains(src, "/go/src/")
 }
+
+// SelfFilter SelfFilter
+func SelfFilter(src string) bool {
+	return strings.Contains(src, "github.com/wwq-2020/go.common")
+}
