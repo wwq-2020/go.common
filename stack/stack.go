@@ -30,8 +30,8 @@ func Caller(depth int) string {
 }
 
 // Callers Callers
-func Callers(filter func(string) bool) string {
-	filter = combineFilter(filter, stackfilter)
+func Callers(filters ...func(string) bool) string {
+	filter := combineFilter(append(filters, stackfilter)...)
 	pcs := make([]uintptr, 1024)
 	pcs = pcs[:runtime.Callers(0, pcs)]
 	frames := runtime.CallersFrames(pcs)
