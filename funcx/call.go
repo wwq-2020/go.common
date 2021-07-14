@@ -56,8 +56,8 @@ func (s *sliceArgsSpliter) SplitArgs() [][]interface{} {
 	return s.parts
 }
 
-// NewSliceArgsSpliterFromObj NewSliceArgsSpliterFromObj
-func NewSliceArgsSpliterFromObj(size int, args interface{}) ArgsSpliter {
+// SliceArgsSpliterFromObj SliceArgsSpliterFromObj
+func SliceArgsSpliterFromObj(size int, args interface{}) ArgsSpliter {
 	t := reflect.TypeOf(args)
 	if t.Kind() != reflect.Slice {
 		return &sliceArgsSpliter{}
@@ -81,8 +81,8 @@ func NewSliceArgsSpliterFromObj(size int, args interface{}) ArgsSpliter {
 	}
 }
 
-// NewSliceArgsSpliterFromSlice NewSliceArgsSpliterFromSlice
-func NewSliceArgsSpliterFromSlice(size int, args ...interface{}) ArgsSpliter {
+// SliceArgsSpliterFromSlice SliceArgsSpliterFromSlice
+func SliceArgsSpliterFromSlice(size int, args ...interface{}) ArgsSpliter {
 	var parts [][]interface{}
 	part := make([]interface{}, 0, size)
 	length := len(args)
