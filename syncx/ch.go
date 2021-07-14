@@ -32,6 +32,9 @@ func BatchSubscribeChans(ctx context.Context, items map[interface{}]interface{})
 			Dir:  reflect.SelectRecv,
 			Chan: kValue,
 		}
+		if vType.NumIn() > 0 && kValue.Type().Elem() != vType.In(0) {
+			continue
+		}
 		cases = append(cases, item)
 		funcs = append(funcs, &callbackFunc{
 			f:        vValue,
