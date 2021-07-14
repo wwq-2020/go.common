@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/wwq-2020/go.common/bus"
 	"github.com/wwq-2020/go.common/errors"
 	"github.com/wwq-2020/go.common/log"
-	"github.com/wwq-2020/go.common/syncx"
 	"github.com/wwq-2020/go.common/util"
 )
 
@@ -333,6 +333,6 @@ func ChangableTransport(ctx context.Context, ch chan struct{}, getter func() *Tr
 		crt.rt.Store(rt)
 	}
 	callback()
-	syncx.SubscribeChans(ctx, ch, callback)
+	bus.SubscribeChans(ctx, ch, callback)
 	return crt
 }
