@@ -19,7 +19,7 @@ func (a *aa) A() {
 func TestBatchSubscribeChans(t *testing.T) {
 	ch1 := make(chan *aa)
 	ch2 := make(chan int)
-	BatchSubscribeChans(context.TODO(), MapChanSpliterFromObj(map[interface{}]interface{}{
+	BatchSubscribeChansContext(context.TODO(), MapChanSpliterFromObj(map[interface{}]interface{}{
 		ch1: func(i a) {
 			fmt.Println("hello", i)
 		},

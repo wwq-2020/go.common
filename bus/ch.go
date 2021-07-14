@@ -46,8 +46,15 @@ type callbackFunc struct {
 	hasInput bool
 }
 
+// BatchSubscribeChansContext BatchSubscribeChansContext
+func BatchSubscribeChansContext(ctx context.Context, chanSpliter ChanSpliter) {
+	items := chanSpliter.SplitChan()
+	items[ctx] = func() {}
+	BatchSubscribeChans(MapChanSpliterFromMap(items))
+}
+
 // BatchSubscribeChans BatchSubscribeChans
-func BatchSubscribeChans(ctx context.Context, chanSpliter ChanSpliter) {
+func BatchSubscribeChans(chanSpliter ChanSpliter) {
 	items := chanSpliter.SplitChan()
 	cases := make([]reflect.SelectCase, 0, len(items)+1)
 	funcs := make([]*callbackFunc, 0, len(items)+1)
@@ -79,11 +86,6 @@ func BatchSubscribeChans(ctx context.Context, chanSpliter ChanSpliter) {
 		})
 	}
 
-	ctxItem := reflect.SelectCase{
-		Dir:  reflect.SelectRecv,
-		Chan: reflect.ValueOf(ctx.Done()),
-	}
-	cases = append(cases, ctxItem)
 	go func() {
 		for {
 			chosen, recv, ok := reflect.Select(cases)
@@ -101,12 +103,21 @@ func BatchSubscribeChans(ctx context.Context, chanSpliter ChanSpliter) {
 }
 
 // SubscribeChans SubscribeChans
-func SubscribeChans(ctx context.Context, callbak interface{}, chs ...interface{}) {
+func SubscribeChans(callbak interface{}, chs ...interface{}) {
 	m := make(map[interface{}]interface{}, len(chs))
 	for _, ch := range chs {
 		m[ch] = callbak
 	}
-	BatchSubscribeChans(ctx, MapChanSpliterFromMap(m))
+	BatchSubscribeChans(MapChanSpliterFromMap(m))
+}
+
+// SubscribeChansContext SubscribeChansContext
+func SubscribeChansContext(ctx context.Context, callbak interface{}, chs ...interface{}) {
+	m := make(map[interface{}]interface{}, len(chs))
+	for _, ch := range chs {
+		m[ch] = callbak
+	}
+	BatchSubscribeChansContext(ctx, MapChanSpliterFromMap(m))
 }
 
 // AggregateChan AggregateChan
