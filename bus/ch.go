@@ -69,7 +69,7 @@ func BatchSubscribeChans(ctx context.Context, chanSpliter ChanSpliter) {
 			Dir:  reflect.SelectRecv,
 			Chan: kValue,
 		}
-		if vType.NumIn() > 0 && kValue.Type().Elem() != vType.In(0) {
+		if vType.NumIn() > 0 && !kValue.Type().Elem().AssignableTo(vType.In(0)) {
 			continue
 		}
 		cases = append(cases, item)

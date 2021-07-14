@@ -1,14 +1,8 @@
 package funcx
 
 import (
+	"context"
 	"reflect"
-
-	"github.com/wwq-2020/go.common/errors"
-)
-
-// errs
-var (
-	ErrFunction = errors.Std("not function")
 )
 
 // Call Call
@@ -33,9 +27,10 @@ func Call(fn interface{}, args ...interface{}) {
 			break
 		}
 		argType := reflect.ValueOf(arg)
-		if fnType.In(i).Kind() != argType.Kind() {
+		if !argType.Type().AssignableTo(fnType.In(i)) {
 			return
 		}
+
 		values = append(values, reflect.ValueOf(arg))
 	}
 	fnValue.Call(values)
@@ -106,5 +101,13 @@ func BatchCall(fn interface{}, argsSpliter ArgsSpliter) {
 	args := argsSpliter.SplitArgs()
 	for _, each := range args {
 		Call(fn, each...)
+	}
+}
+
+// BatchCallContext BatchCallContext
+func BatchCallContext(ctx context.Context, fn interface{}, argsSpliter ArgsSpliter) {
+	args := argsSpliter.SplitArgs()
+	for _, each := range args {
+		Call(fn, append([]interface{}{ctx}, each...)...)
 	}
 }
