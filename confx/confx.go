@@ -1,4 +1,4 @@
-package conf
+package confx
 
 import (
 	"flag"
@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/log"
 )
 
@@ -39,7 +39,7 @@ func MustLoad(dest interface{}) {
 // Load Load
 func Load(dest interface{}) error {
 	if err := ParseFile(*cfgPath, dest); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -56,10 +56,10 @@ func MustParseFile(file string, dest interface{}) {
 func ParseFile(file string, dest interface{}) error {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	if err := Parse(data, dest); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func Parse(data []byte, dest interface{}) error {
 		var err error
 		metadata, err = toml.Decode(string(data), dest)
 		if err != nil {
-			return errors.Trace(err)
+			return errorsx.Trace(err)
 		}
 		return nil
 	}
@@ -87,12 +87,12 @@ func Parse(data []byte, dest interface{}) error {
 		keys := append(field.Ancestors, field.Field.Tag.Get("toml"))
 		key := strings.Join(keys, ".")
 		if !metadata.IsDefined(keys...) {
-			return errors.TraceWithField(ErrKeyNil, key, strings.Join(append(field.Ancestors, field.Field.Name), "."))
+			return errorsx.TraceWithField(ErrKeyNil, key, strings.Join(append(field.Ancestors, field.Field.Name), "."))
 		}
 		return nil
 	})
 	if err := ParseBy(data, dest, "toml", decodeFunc, walker); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -108,10 +108,10 @@ func MustParseBy(data []byte, dest interface{}, tag string, decodeFunc DecodeFun
 // ParseBy ParseBy
 func ParseBy(data []byte, dest interface{}, tag string, decodeFunc DecodeFunc, walker Walker) error {
 	if err := decodeFunc(data, dest); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	if err := Walk(dest, tag, walker); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -129,7 +129,7 @@ func Walk(dest interface{}, tag string, walker Walker) error {
 	t := reflect.TypeOf(dest)
 	v := reflect.ValueOf(dest)
 	if err := walk(t, v, nil, tag, walker); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -150,7 +150,7 @@ func walk(t reflect.Type, v reflect.Value, ancestors []string, tag string, walke
 			Value:     v.Field(i),
 			Ancestors: ancestors,
 		}); err != nil {
-			return errors.Trace(err)
+			return errorsx.Trace(err)
 		}
 
 		if fieldType.Kind() == reflect.Ptr {
@@ -161,7 +161,7 @@ func walk(t reflect.Type, v reflect.Value, ancestors []string, tag string, walke
 		}
 		ancestors = append(ancestors, field.Tag.Get(tag))
 		if err := walk(fieldType, fieldValue, ancestors, tag, walker); err != nil {
-			return errors.Trace(err)
+			return errorsx.Trace(err)
 		}
 	}
 	return nil

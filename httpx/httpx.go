@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/log"
 	"github.com/wwq-2020/go.common/stack"
 )
@@ -47,20 +47,20 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 		var err error
 		reqData, err = options.codec.Encode(req)
 		if err != nil {
-			return errors.TraceWithFields(err, stack)
+			return errorsx.TraceWithFields(err, stack)
 		}
 		stack.Set("reqData", string(reqData))
 		reqBody = bytes.NewReader(reqData)
 	}
 	httpReq, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
-		return errors.TraceWithFields(err, stack)
+		return errorsx.TraceWithFields(err, stack)
 	}
 	ctx = log.ContextEnsureTraceID(ctx)
 	httpReq = httpReq.WithContext(ctx)
 	if options.reqInterceptor != nil {
 		if err := options.reqInterceptor(httpReq); err != nil {
-			return errors.TraceWithFields(err, stack)
+			return errorsx.TraceWithFields(err, stack)
 		}
 	}
 	start := time.Now()
@@ -69,12 +69,12 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 
 	httpResp, err := options.client.Do(httpReq)
 	if err != nil {
-		return errors.TraceWithFields(err, stack)
+		return errorsx.TraceWithFields(err, stack)
 	}
 
 	respData, respBody, err := DrainBody(httpResp.Body)
 	if err != nil {
-		return errors.TraceWithFields(err, stack)
+		return errorsx.TraceWithFields(err, stack)
 	}
 	elapsed := time.Now().Sub(start).Milliseconds()
 	stack.Set("respData", string(respData))
@@ -86,12 +86,12 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 
 	if options.respInterceptor != nil {
 		if err := options.respInterceptor(httpResp); err != nil {
-			return errors.TraceWithFields(err, stack)
+			return errorsx.TraceWithFields(err, stack)
 		}
 	}
 	if resp != nil {
 		if err := options.codec.Decode(respData, resp); err != nil {
-			return errors.TraceWithFields(err, stack)
+			return errorsx.TraceWithFields(err, stack)
 		}
 	}
 

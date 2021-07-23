@@ -1,14 +1,14 @@
-package conf
+package confx
 
 import (
 	"strconv"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 )
 
 // errs
 var (
-	ErrKeyNil = errors.Std("key nil")
+	ErrKeyNil = errorsx.Std("key nil")
 )
 
 // Walker Walker

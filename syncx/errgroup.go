@@ -3,7 +3,7 @@ package syncx
 import (
 	"context"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -33,7 +33,7 @@ func (eg *ErrGroup) Go(task func(ctx context.Context) error) {
 		eg.eg.Go(func() error {
 			defer func() { <-eg.ch }()
 			if err := task(eg.ctx); err != nil {
-				return errors.Trace(err)
+				return errorsx.Trace(err)
 			}
 			return nil
 		})
@@ -43,7 +43,7 @@ func (eg *ErrGroup) Go(task func(ctx context.Context) error) {
 // Wait Wait
 func (eg *ErrGroup) Wait() error {
 	if err := eg.eg.Wait(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/httpx"
 	"google.golang.org/protobuf/proto"
 )
@@ -60,7 +60,7 @@ func (c *client) Invoke(ctx context.Context, method string, in, out proto.Messag
 		defer cancel()
 	}
 	if err := httpx.Post(ctx, url, in, out, httpx.WithClient(c.httpClient)); err != nil {
-		return errors.TraceWithField(err, "method", method)
+		return errorsx.TraceWithField(err, "method", method)
 	}
 	return nil
 }

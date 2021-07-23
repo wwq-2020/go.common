@@ -6,8 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 )
 
 var (
@@ -16,20 +15,20 @@ var (
 
 // errs
 var (
-	ErrInvalidByteStr = errors.Std("invalid")
+	ErrInvalidByteStr = errorsx.Std("invalid")
 )
 
 // ParseByteStr ParseByteStr
 func ParseByteStr(val string) (int64, error) {
 	parts := byteStrReg.FindStringSubmatch(val)
 	if len(parts) != 4 {
-		return 0, errors.Trace(ErrInvalidByteStr)
+		return 0, errorsx.Trace(ErrInvalidByteStr)
 	}
 	leftStr := parts[1]
 	rightStr := parts[3]
 	left, err := strconv.ParseFloat(leftStr, 64)
 	if err != nil {
-		return 0, errors.Trace(err)
+		return 0, errorsx.Trace(err)
 	}
 	unit := 1
 	switch strings.ToLower(rightStr) {

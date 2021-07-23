@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 )
 
 // FileFormatter FileFormatter
@@ -117,7 +117,7 @@ func (p *periodRotatedOutput) Write(b []byte) (int, error) {
 	defer p.Unlock()
 	n, err := p.output.Write(b)
 	if err != nil {
-		return n, errors.Trace(err)
+		return n, errorsx.Trace(err)
 	}
 	return n, nil
 }
@@ -126,7 +126,7 @@ func (p *periodRotatedOutput) Close() error {
 	p.Lock()
 	defer p.Unlock()
 	if err := p.output.Close(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -135,7 +135,7 @@ func (p *periodRotatedOutput) Sync() error {
 	p.Lock()
 	defer p.Unlock()
 	if err := p.output.Sync(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -153,7 +153,7 @@ func (s *sizeRotatedOutput) Sync() error {
 	s.Lock()
 	defer s.Unlock()
 	if err := s.output.Sync(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -162,7 +162,7 @@ func (s *sizeRotatedOutput) Close() error {
 	s.Lock()
 	defer s.Unlock()
 	if err := s.output.Close(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -176,7 +176,7 @@ func (s *sizeRotatedOutput) Write(b []byte) (int, error) {
 	n, err := s.output.Write(b)
 	s.bytes += uint64(n)
 	if err != nil {
-		return n, errors.Trace(err)
+		return n, errorsx.Trace(err)
 	}
 	return n, nil
 }

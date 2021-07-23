@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/stack"
 	"go.uber.org/zap"
 )
@@ -68,7 +68,7 @@ func zapFieldsFromContext(ctx context.Context) []zap.Field {
 }
 
 func zapFieldsFromError(err error) []zap.Field {
-	fields := errors.StackFields(err)
+	fields := errorsx.StackFields(err)
 	return fields2ZapFields(fields)
 }
 

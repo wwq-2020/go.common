@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 )
 
 // Conn Conn
@@ -23,7 +23,7 @@ type conn struct {
 func (conn *conn) PrepareContext(ctx context.Context, query string) (PreparedStmt, error) {
 	stdStmt, err := conn.Conn.PrepareContext(ctx, query)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return &stmt{Stmt: stdStmt}, nil
 }
@@ -31,21 +31,21 @@ func (conn *conn) PrepareContext(ctx context.Context, query string) (PreparedStm
 func (conn *conn) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error) {
 	stdTx, err := conn.Conn.BeginTx(ctx, opts)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return &tx{Tx: stdTx}, nil
 }
 
 func (conn *conn) Close() error {
 	if err := conn.Conn.Close(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
 
 func (conn *conn) PingContext(ctx context.Context) error {
 	if err := conn.Conn.PingContext(ctx); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -60,7 +60,7 @@ func (conn *conn) ExecContext(ctx context.Context, query string, args ...interfa
 	}
 	result, err := conn.Conn.ExecContext(ctx, query, args...)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return result, nil
 }
@@ -77,7 +77,7 @@ func (conn *conn) QueryContext(ctx context.Context, query string, args ...interf
 	}
 	stdRows, err := conn.Conn.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return &rows{Rows: stdRows, cancel: cancel}, nil
 }

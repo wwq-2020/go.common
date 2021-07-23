@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 )
 
 // PreparedStmt PreparedStmt
@@ -29,7 +29,7 @@ func (stmt *stmt) ExecContext(ctx context.Context, args ...interface{}) (sql.Res
 	}
 	result, err := stmt.Stmt.ExecContext(ctx, args...)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return result, nil
 }
@@ -46,7 +46,7 @@ func (stmt *stmt) QueryContext(ctx context.Context, args ...interface{}) (r Rows
 	}
 	stdRows, err := stmt.Stmt.QueryContext(ctx, args...)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return &rows{Rows: stdRows, cancel: cancel}, nil
 }

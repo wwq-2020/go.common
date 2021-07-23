@@ -3,7 +3,7 @@ package httpx
 import (
 	"encoding/json"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 )
 
 // Codec Codec
@@ -22,7 +22,7 @@ func JSONCodec() Codec {
 func (c *jsonCodec) Encode(obj interface{}) ([]byte, error) {
 	data, err := json.Marshal(obj)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return data, nil
 }
@@ -30,7 +30,7 @@ func (c *jsonCodec) Encode(obj interface{}) ([]byte, error) {
 func (c *jsonCodec) Decode(data []byte, obj interface{}) error {
 	err := json.Unmarshal(data, obj)
 	if err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }

@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/wwq-2020/go.common/errors"
 	"github.com/wwq-2020/go.common/stack"
+	"github.com/wwq-2020/go.common/errorsx"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -213,7 +213,7 @@ var (
 // Sync Sync
 func Sync() error {
 	if err := std.Sync(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -387,7 +387,7 @@ func WithZapFields(fields ...zap.Field) Logger {
 
 // WithFieldsFromErr WithFieldsFromErr
 func WithFieldsFromErr(err error) Logger {
-	return stdWith.WithFields(errors.Fields(err))
+	return stdWith.WithFields(errorsx.Fields(err))
 }
 
 // WithFieldsFrom WithFieldsFrom
@@ -426,7 +426,7 @@ func ContextLoggerWithZapFields(ctx context.Context, fields ...zap.Field) Logger
 // ContextLoggerWithFieldsFromErr ContextLoggerWithFieldsFromErr
 func ContextLoggerWithFieldsFromErr(ctx context.Context, err error) Logger {
 	logger := LoggerFromContext(ctx)
-	return logger.WithFields(errors.Fields(err))
+	return logger.WithFields(errorsx.Fields(err))
 }
 
 // ContextLoggerWithFieldsFrom ContextLoggerWithFieldsFrom
@@ -657,7 +657,7 @@ func (l *logger) WithZapFields(fields ...zap.Field) Logger {
 
 // WithError WithError
 func (l *logger) WithError(err error) Logger {
-	stack := errors.AllFields(err)
+	stack := errorsx.AllFields(err)
 	options := *l.options
 	return &logger{
 		l:       l.l.With(fields2ZapFields(stack)...),
@@ -678,14 +678,14 @@ func (l *logger) WithField(key string, val interface{}) Logger {
 
 func (l *logger) Sync() error {
 	if err := l.l.Sync(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
 
 func (l *logger) Close() error {
 	if err := l.options.output.Close(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }

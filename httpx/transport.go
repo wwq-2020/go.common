@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/wwq-2020/go.common/bus"
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/log"
 	"github.com/wwq-2020/go.common/util"
 )
@@ -60,7 +60,7 @@ func (rt *retriableTransport) RoundTrip(req *http.Request) (*http.Response, erro
 	if rt.maxRetry > 0 && req.Body != nil {
 		saved, err = ioutil.ReadAll(req.Body)
 		if err != nil {
-			return nil, errors.Trace(err)
+			return nil, errorsx.Trace(err)
 		}
 	}
 	var resp *http.Response
@@ -73,14 +73,14 @@ func (rt *retriableTransport) RoundTrip(req *http.Request) (*http.Response, erro
 			continue
 		}
 		if err != nil {
-			return nil, errors.Trace(err)
+			return nil, errorsx.Trace(err)
 		}
 		return resp, nil
 	}
 	if resp != nil {
 		return resp, nil
 	}
-	return nil, errors.Trace(err)
+	return nil, errorsx.Trace(err)
 }
 
 // DefaultRetryCheck DefaultRetryCheck
@@ -210,7 +210,7 @@ func Transport(transportConf *TransportConf) http.RoundTripper {
 				DebugContext(ctx, "dial")
 			conn, err := dialer.DialContext(ctx, network, address)
 			if err != nil {
-				return nil, errors.Trace(err)
+				return nil, errorsx.Trace(err)
 			}
 			return conn, nil
 		},
@@ -250,7 +250,7 @@ func Transport(transportConf *TransportConf) http.RoundTripper {
 			DebugContext(ctx, "dial")
 		conn, err := dialer.DialContext(ctx, network, address)
 		if err != nil {
-			return nil, errors.Trace(err)
+			return nil, errorsx.Trace(err)
 		}
 		return conn, nil
 	}
@@ -319,7 +319,7 @@ type changableTransport struct {
 func (crt *changableTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := crt.rt.Load().(http.RoundTripper).RoundTrip(req)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return resp, nil
 }

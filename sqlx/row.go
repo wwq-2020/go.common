@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 )
 
 // Row 对应 *sql.Row.
@@ -22,14 +22,14 @@ func (r *row) Scan(dest ...interface{}) error {
 		defer r.cancel()
 	}
 	if err := r.Row.Scan(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
 
 func (r *row) Err() error {
 	if err := r.Row.Err(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }

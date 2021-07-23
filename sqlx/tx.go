@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 )
 
 // Tx Tx
@@ -21,7 +21,7 @@ type tx struct {
 
 func (tx *tx) Commit() error {
 	if err := tx.Tx.Commit(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 
@@ -30,7 +30,7 @@ func (tx *tx) Commit() error {
 func (tx *tx) PrepareContext(ctx context.Context, query string) (PreparedStmt, error) {
 	stdStmt, err := tx.Tx.PrepareContext(ctx, query)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return &stmt{Stmt: stdStmt}, nil
 }
@@ -45,7 +45,7 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args ...interface{}
 	}
 	result, err := tx.Tx.ExecContext(ctx, query, args...)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return result, nil
 }
@@ -62,7 +62,7 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args ...interface{
 	}
 	stdRows, err := tx.Tx.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return &rows{Rows: stdRows, cancel: cancel}, nil
 }

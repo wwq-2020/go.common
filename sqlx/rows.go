@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 )
 
 // Rows Rows
@@ -28,7 +28,7 @@ func (r *rows) Close() error {
 		defer r.cancel()
 	}
 	if err := r.Rows.Close(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -36,7 +36,7 @@ func (r *rows) Close() error {
 func (r *rows) Columns() ([]string, error) {
 	columns, err := r.Rows.Columns()
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return columns, nil
 }
@@ -52,14 +52,14 @@ func (r *rows) NextResultSet() bool {
 func (r *rows) ColumnTypes() ([]*sql.ColumnType, error) {
 	columnTypes, err := r.Rows.ColumnTypes()
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return columnTypes, nil
 }
 
 func (r *rows) Err() error {
 	if err := r.Rows.Err(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -74,7 +74,7 @@ func (r *rows) Next() bool {
 
 func (r *rows) Scan(dest ...interface{}) error {
 	if err := r.Rows.Scan(dest...); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }

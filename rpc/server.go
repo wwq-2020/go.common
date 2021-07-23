@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/httpx"
 	"github.com/wwq-2020/go.common/log"
 	"github.com/wwq-2020/go.common/rpc/middleware"
@@ -17,7 +17,7 @@ import (
 
 // errs
 var (
-	ErrUnExpectedMessageType = errors.New("unexpected messge type")
+	ErrUnExpectedMessageType = errorsx.New("unexpected messge type")
 )
 
 // ServerOption ServerOption
@@ -76,14 +76,14 @@ func (s *server) ListenAndServe() error {
 	s.options.httpServer.Handler = s.options.router
 	if err := s.options.httpServer.ListenAndServe(); err != nil &&
 		err != http.ErrServerClosed {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
 
 func (s *server) Stop(ctx context.Context) error {
 	if err := s.options.httpServer.Shutdown(ctx); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -132,7 +132,7 @@ func (h *httpMethodHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) 
 	resp, err := h.handler(h.service, ctx, reqDec, h.server.options.interceptor)
 	if err != nil {
 		log.ErrorContext(ctx, err)
-		code := errors.Code(err)
+		code := errorsx.Code(err)
 		w.Header().Add("rpccode", strconv.Itoa(code))
 		w.Header().Add("rpcmsg", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)

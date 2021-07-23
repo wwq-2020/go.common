@@ -3,7 +3,7 @@ package httpx
 import (
 	"net/http"
 
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/stack"
 )
 
@@ -26,7 +26,7 @@ func ChainedReqInterceptor(reqInterceptors ...ReqInterceptor) ReqInterceptor {
 	return func(httpReq *http.Request) error {
 		for _, reqInterceptor := range reqInterceptors {
 			if err := reqInterceptor(httpReq); err != nil {
-				return errors.Trace(err)
+				return errorsx.Trace(err)
 			}
 		}
 		return nil
@@ -41,7 +41,7 @@ func StatusCodeRespInterceptor(expected int) RespInterceptor {
 			return nil
 		}
 		stack := stack.New().Set("expected statuscode", expected).Set("got statuscode", got)
-		return errors.NewWithFields("statuscode mismatch", stack)
+		return errorsx.NewWithFields("statuscode mismatch", stack)
 	}
 }
 
@@ -51,7 +51,7 @@ func StatusCodeRangeRespInterceptor(codeStart, codeEnd int) RespInterceptor {
 		got := httpResp.StatusCode
 		if got < codeStart || got > codeEnd {
 			stack := stack.New().Set("expected statuscode start", codeStart).Set("expected statuscode end", codeEnd)
-			return errors.NewWithFields("statuscode mismatch", stack)
+			return errorsx.NewWithFields("statuscode mismatch", stack)
 		}
 		return nil
 	}
@@ -62,7 +62,7 @@ func ChainedRespInterceptor(respInterceptors ...RespInterceptor) RespInterceptor
 	return func(httpResp *http.Response) error {
 		for _, respInterceptor := range respInterceptors {
 			if err := respInterceptor(httpResp); err != nil {
-				return errors.Trace(err)
+				return errorsx.Trace(err)
 			}
 		}
 		return nil

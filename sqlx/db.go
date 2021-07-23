@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-	"github.com/wwq-2020/go.common/errors"
+	"github.com/wwq-2020/go.common/errorsx"
 )
 
 // Conf Conf
@@ -76,7 +76,7 @@ func Open(conf *Conf) (DB, error) {
 	}
 	stdDB, err := sql.Open("mysql", mysqlConfig.FormatDSN())
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	stdDB.SetMaxOpenConns(conf.MaxOpenConns)
 	stdDB.SetMaxIdleConns(conf.MaxIdleConns)
@@ -87,14 +87,14 @@ func Open(conf *Conf) (DB, error) {
 func (db *db) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error) {
 	stdTx, err := db.db.BeginTx(ctx, opts)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return &tx{Tx: stdTx}, nil
 }
 
 func (db *db) Close() error {
 	if err := db.db.Close(); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -102,14 +102,14 @@ func (db *db) Close() error {
 func (db *db) Conn(ctx context.Context) (Conn, error) {
 	stdConn, err := db.db.Conn(ctx)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return &conn{Conn: stdConn}, nil
 }
 
 func (db *db) PingContext(ctx context.Context) error {
 	if err := db.db.PingContext(ctx); err != nil {
-		return errors.Trace(err)
+		return errorsx.Trace(err)
 	}
 	return nil
 }
@@ -117,7 +117,7 @@ func (db *db) PingContext(ctx context.Context) error {
 func (db *db) PrepareContext(ctx context.Context, query string) (PreparedStmt, error) {
 	stdStmt, err := db.db.PrepareContext(ctx, query)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return &stmt{Stmt: stdStmt}, nil
 }
@@ -132,7 +132,7 @@ func (db *db) ExecContext(ctx context.Context, query string, args ...interface{}
 	}
 	result, err := db.db.ExecContext(ctx, query, args...)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return result, nil
 }
@@ -149,7 +149,7 @@ func (db *db) QueryContext(ctx context.Context, query string, args ...interface{
 	}
 	stdRows, err := db.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errorsx.Trace(err)
 	}
 	return &rows{Rows: stdRows, cancel: cancel}, nil
 }
