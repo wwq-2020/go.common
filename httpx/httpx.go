@@ -82,7 +82,6 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 		WithField("elapsed", elapsed).
 		InfoContext(ctx, "invoke finish")
 	httpResp.Body = respBody
-	defer httpResp.Body.Close()
 
 	if options.respInterceptor != nil {
 		if err := options.respInterceptor(httpResp); err != nil {
