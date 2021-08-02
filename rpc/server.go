@@ -74,6 +74,8 @@ func NewServer(opts ...ServerOption) Server {
 
 func (s *server) ListenAndServe() error {
 	s.options.httpServer.Handler = s.options.router
+	log.WithField("addr", s.options.httpServer.Addr).
+		Info("start serving")
 	if err := s.options.httpServer.ListenAndServe(); err != nil &&
 		err != http.ErrServerClosed {
 		return errorsx.Trace(err)
@@ -82,6 +84,8 @@ func (s *server) ListenAndServe() error {
 }
 
 func (s *server) Stop(ctx context.Context) error {
+	log.WithField("addr", s.options.httpServer.Addr).
+		Info("stop serving")
 	if err := s.options.httpServer.Shutdown(ctx); err != nil {
 		return errorsx.Trace(err)
 	}
