@@ -117,8 +117,10 @@ type httpMethodHandler struct {
 
 func (h *httpMethodHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
-	ctx = log.ContextEnsureTraceID(ctx)
+	traceID := log.GenTraceID()
+	ctx = log.ContextWithTraceID(ctx, traceID)
 	req = req.WithContext(ctx)
+	w.Header().Set("traceID", traceID)
 	reqData, reqBody, err := httpx.DrainBody(req.Body)
 	if err != nil {
 		log.ErrorContext(ctx, err)
