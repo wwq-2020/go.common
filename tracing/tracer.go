@@ -63,8 +63,8 @@ func InitGlobalTracer(serviceName, endpoint string, sampleRate float64) (func(),
 // Span Span
 type Span interface {
 	Finish()
-	WithField(string, interface{})
-	WithFields(stack.Fields)
+	WithField(string, interface{}) Span
+	WithFields(stack.Fields) Span
 }
 
 type span struct {
@@ -75,12 +75,14 @@ func (s *span) Finish() {
 	s.span.Finish()
 }
 
-func (s *span) WithField(key string, value interface{}) {
+func (s *span) WithField(key string, value interface{}) Span {
 	s.span.LogFields(opentracinglog.Object(key, value))
+	return s
 }
 
-func (s *span) WithFields(fields stack.Fields) {
+func (s *span) WithFields(fields stack.Fields) Span {
 	s.span.LogKV(fields.KVsSlice()...)
+	return s
 }
 
 var defaultStartSpanOptions = StartSpanOptions{
@@ -119,10 +121,8 @@ func StartSpanFromContext(ctx context.Context, operationName string, opts ...Sta
 	}
 
 	options := defaultStartSpanOptions
+
 	for _, opt := range opts {
-		if opt == nil {
-			continue
-		}
 		opt(&options)
 	}
 

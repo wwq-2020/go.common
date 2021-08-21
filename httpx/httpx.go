@@ -10,6 +10,7 @@ import (
 	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/log"
 	"github.com/wwq-2020/go.common/stack"
+	"github.com/wwq-2020/go.common/tracing"
 )
 
 // Get Get
@@ -37,10 +38,14 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	for _, opt := range opts {
 		opt(&options)
 	}
-
+	operationName := method + "." + url
+	tracingOpts := StartSpanOptionsFromContext(ctx)
+	span, ctx := tracing.StartSpanFromContext(ctx, operationName, tracingOpts...)
+	defer span.Finish()
 	stack := stack.New().
 		Set("httpmethod", method).
 		Set("url", url)
+	span.WithFields(stack)
 	var reqBody io.Reader
 	var reqData []byte
 	if req != nil {
@@ -49,7 +54,9 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 		if err != nil {
 			return errorsx.TraceWithFields(err, stack)
 		}
-		stack.Set("reqData", string(reqData))
+		reqDataStr := string(reqData)
+		stack.Set("reqData", reqDataStr)
+		span.WithField("reqData", reqDataStr)
 		reqBody = bytes.NewReader(reqData)
 	}
 	httpReq, err := http.NewRequest(method, url, reqBody)
@@ -77,8 +84,11 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 		return errorsx.TraceWithFields(err, stack)
 	}
 	elapsed := time.Now().Sub(start).Milliseconds()
-	stack.Set("respData", string(respData))
-	log.WithField("respData", string(respData)).
+	respDataStr := string(respData)
+	stack.Set("respData", respDataStr)
+	span.WithField("respData", respDataStr).
+		WithField("elapsed", elapsed)
+	log.WithField("respData", respDataStr).
 		WithField("elapsed", elapsed).
 		InfoContext(ctx, "invoke finish")
 	httpResp.Body = respBody
