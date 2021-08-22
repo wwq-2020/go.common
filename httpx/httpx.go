@@ -33,7 +33,7 @@ func Delete(ctx context.Context, url string, req, resp interface{}, opts ...Opti
 	return do(ctx, http.MethodDelete, url, req, resp, opts...)
 }
 
-func do(ctx context.Context, method, url string, req, resp interface{}, opts ...Option) error {
+func do(ctx context.Context, method, url string, req, resp interface{}, opts ...Option) (err error) {
 	options := defaultOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -41,7 +41,8 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	operationName := method + "." + url
 	tracingOpts := StartSpanOptionsFromContext(ctx)
 	span, ctx := tracing.StartSpanFromContext(ctx, operationName, tracingOpts...)
-	defer span.Finish()
+	defer span.Finish(&err)
+
 	stack := stack.New().
 		Set("httpmethod", method).
 		Set("url", url)

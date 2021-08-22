@@ -2,6 +2,7 @@ package tracing
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/opentracing/opentracing-go"
 	opentracinglog "github.com/opentracing/opentracing-go/log"
@@ -62,7 +63,7 @@ func InitGlobalTracer(serviceName, endpoint string, sampleRate float64) (func(),
 
 // Span Span
 type Span interface {
-	Finish()
+	Finish(err *error)
 	WithField(string, interface{}) Span
 	WithFields(stack.Fields) Span
 }
@@ -71,7 +72,17 @@ type span struct {
 	span opentracing.Span
 }
 
-func (s *span) Finish() {
+func (s *span) Finish(err *error) {
+	fields := make([]opentracinglog.Field, 0, 2)
+	if err != nil {
+		fields = append(fields, opentracinglog.String("status", "failed"))
+		fields = append(fields, opentracinglog.String("error", (*err).Error()))
+		s.span.LogFields(fields...)
+		s.span.Finish()
+		return
+	}
+	fields = append(fields, opentracinglog.String("status", "success"))
+	s.span.LogFields(fields...)
 	s.span.Finish()
 }
 
@@ -121,12 +132,10 @@ func StartSpanFromContext(ctx context.Context, operationName string, opts ...Sta
 	}
 
 	options := defaultStartSpanOptions
-
 	for _, opt := range opts {
 		opt(&options)
 	}
-
-	tracingOptions := make([]opentracing.StartSpanOption, 0, 4)
+	tracingOptions := make([]opentracing.StartSpanOption, 0, 1)
 
 	switch options.spanReferenceType {
 	default:
@@ -139,4 +148,20 @@ func StartSpanFromContext(ctx context.Context, operationName string, opts ...Sta
 
 	opentracingSpan := tracer.StartSpan(operationName, tracingOptions...)
 	return &span{opentracingSpan}, opentracing.ContextWithSpan(ctx, opentracingSpan)
+}
+
+// StartSpan StartSpan
+func StartSpan(ctx context.Context, operationName string) (Span, context.Context) {
+	opentracingSpan := opentracing.GlobalTracer().StartSpan(operationName)
+	return &span{opentracingSpan}, opentracing.ContextWithSpan(ctx, opentracingSpan)
+}
+
+// StartSpanFromHTTPReq StartSpanFromHTTPReq
+func StartSpanFromHTTPReq(ctx context.Context, operationName string, httpReq *http.Request) (Span, context.Context) {
+	parentSpanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(httpReq.Header))
+	if err == nil {
+		opentracingSpan := opentracing.GlobalTracer().StartSpan(operationName, opentracing.ChildOf(parentSpanContext))
+		return &span{opentracingSpan}, opentracing.ContextWithSpan(ctx, opentracingSpan)
+	}
+	return StartSpanFromContext(ctx, operationName)
 }
