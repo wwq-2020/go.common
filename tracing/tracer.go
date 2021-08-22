@@ -74,7 +74,7 @@ type span struct {
 
 func (s *span) Finish(err *error) {
 	fields := make([]opentracinglog.Field, 0, 2)
-	if err != nil {
+	if err != nil && *err != nil {
 		fields = append(fields, opentracinglog.String("status", "failed"))
 		fields = append(fields, opentracinglog.String("error", (*err).Error()))
 		s.span.LogFields(fields...)

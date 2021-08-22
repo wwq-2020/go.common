@@ -7,24 +7,7 @@ import (
 	"net/textproto"
 
 	"github.com/wwq-2020/go.common/log"
-	"github.com/wwq-2020/go.common/tracing"
 )
-
-type startSpanOptionsKey struct{}
-
-// StartSpanOptionsFromContext StartSpanOptionsFromContext
-func StartSpanOptionsFromContext(ctx context.Context) []tracing.StartSpanOption {
-	value := ctx.Value(startSpanOptionsKey{})
-	if value == nil {
-		return nil
-	}
-	return value.([]tracing.StartSpanOption)
-}
-
-// ContextWithStartSpanOptions ContextWithStartSpanOptions
-func ContextWithStartSpanOptions(ctx context.Context, opts ...tracing.StartSpanOption) context.Context {
-	return context.WithValue(ctx, startSpanOptionsKey{}, opts)
-}
 
 // ContextWithClientTrace ContextWithClientTrace
 func ContextWithClientTrace(ctx context.Context) context.Context {

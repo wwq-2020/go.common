@@ -39,8 +39,7 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 		opt(&options)
 	}
 	operationName := method + "." + url
-	tracingOpts := StartSpanOptionsFromContext(ctx)
-	span, ctx := tracing.StartSpanFromContext(ctx, operationName, tracingOpts...)
+	span, ctx := startSpanFromTracingOptions(ctx, operationName, options.tracingOptions)
 	defer span.Finish(&err)
 
 	stack := stack.New().
@@ -106,4 +105,11 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	}
 
 	return nil
+}
+
+func startSpanFromTracingOptions(ctx context.Context, operationName string, tracingOptions TracingOptions) (tracing.Span, context.Context) {
+	if tracingOptions.RootSpan {
+		return tracing.StartSpan(ctx, operationName)
+	}
+	return tracing.StartSpanFromContext(ctx, operationName, tracingOptions.StartSpanOptions...)
 }

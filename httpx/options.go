@@ -2,6 +2,8 @@ package httpx
 
 import (
 	"net/http"
+
+	"github.com/wwq-2020/go.common/tracing"
 )
 
 // Option Option
@@ -13,6 +15,13 @@ type Options struct {
 	client          *http.Client
 	reqInterceptor  ReqInterceptor
 	respInterceptor RespInterceptor
+	tracingOptions  TracingOptions
+}
+
+// TracingOptions TracingOptions
+type TracingOptions struct {
+	StartSpanOptions []tracing.StartSpanOption
+	RootSpan         bool
 }
 
 var defaultOptions = Options{
@@ -20,6 +29,10 @@ var defaultOptions = Options{
 	client:          DefaultClient(),
 	reqInterceptor:  ChainedReqInterceptor(ContentTypeReqInterceptor(ContentTypeJSON)),
 	respInterceptor: ChainedRespInterceptor(StatusCodeRespInterceptor(http.StatusOK)),
+}
+
+var defaultTracingOptions = TracingOptions{
+	RootSpan: true,
 }
 
 // WithCodec WithCodec
@@ -47,5 +60,12 @@ func WithReqInterceptors(reqInterceptors ...ReqInterceptor) Option {
 func WithRespInterceptors(respInterceptors ...RespInterceptor) Option {
 	return func(o *Options) {
 		o.respInterceptor = ChainedRespInterceptor(respInterceptors...)
+	}
+}
+
+// WithTracingOptions WithTracingOptions
+func WithTracingOptions(tracingOptions TracingOptions) Option {
+	return func(o *Options) {
+		o.tracingOptions = tracingOptions
 	}
 }
