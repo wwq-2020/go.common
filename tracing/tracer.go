@@ -227,6 +227,12 @@ func startSpan(ctx context.Context, operationName string, opts ...StartSpanOptio
 func StartSpan(ctx context.Context, operationName string, opts ...StartSpanOption) (Span, context.Context) {
 	opentracingSpan, ctx := startSpan(ctx, operationName, opts...)
 	tracer := opentracing.GlobalTracer()
+	if tracer == noopTracer {
+		traceID := log.TraceIDFromContext(ctx)
+		if traceID == "" {
+			ctx = log.ContextWithTraceID(ctx, log.GenTraceID())
+		}
+	}
 	if tracer != noopTracer {
 		traceID := traceIDFromOpentracingSpan(opentracingSpan)
 		ctx = log.ContextWithTraceID(ctx, traceID)
@@ -263,6 +269,10 @@ func HTTPClientStartSpan(ctx context.Context, operationName string, httpReq *htt
 	tracer := opentracing.GlobalTracer()
 	if tracer == noopTracer {
 		traceID := log.TraceIDFromContext(ctx)
+		if traceID == "" {
+			traceID = log.GenTraceID()
+			ctx = log.ContextWithTraceID(ctx, traceID)
+		}
 		httpReq.Header.Set(TraceIDName, traceID)
 	}
 	if err := tracer.Inject(opentracingSpan.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(httpReq.Header)); err != nil {
