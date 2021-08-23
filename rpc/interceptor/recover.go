@@ -1,17 +1,17 @@
-package middleware
+package interceptor
 
 import (
 	"context"
 	"fmt"
 	"net/http"
 
+	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/log"
 	"github.com/wwq-2020/go.common/stack"
-	"google.golang.org/grpc"
 )
 
 // Recover Recover
-func Recover(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (_ interface{}, err error) {
+func Recover(ctx context.Context, req interface{}, handler ServerHandler) (_ interface{}, err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			if e == http.ErrAbortHandler {
@@ -28,5 +28,9 @@ func Recover(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, h
 				ErrorContext(ctx, err)
 		}
 	}()
-	return handler(ctx, req)
+	resp, err := handler(ctx, req)
+	if err != nil {
+		return nil, errorsx.Trace(err)
+	}
+	return resp, nil
 }

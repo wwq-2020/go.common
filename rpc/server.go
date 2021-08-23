@@ -2,170 +2,145 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"net/http"
-	"strconv"
-	"time"
 
 	"github.com/wwq-2020/go.common/errorsx"
-	"github.com/wwq-2020/go.common/httpx"
 	"github.com/wwq-2020/go.common/log"
-	"github.com/wwq-2020/go.common/rpc/middleware"
+	"github.com/wwq-2020/go.common/rpc/interceptor"
 	"google.golang.org/grpc"
 )
 
-// errs
-var (
-	ErrUnExpectedMessageType = errorsx.New("unexpected messge type")
-)
-
-// ServerOption ServerOption
-type ServerOption func(*ServerOptions)
-
-// ServerOptions ServerOptions
-type ServerOptions struct {
-	httpServer  *http.Server
-	router      Router
-	interceptor grpc.UnaryServerInterceptor
-}
-
-var defaultServerOptions = ServerOptions{
-	httpServer: httpx.Server(nil),
-	router:     NewRouter(),
-}
-
-// WithHTTPServer WithHTTPServer
-func WithHTTPServer(httpServer *http.Server) ServerOption {
-	return func(o *ServerOptions) {
-		o.httpServer = httpServer
-	}
-}
-
-// WithServerInterceptors WithServerInterceptors
-func WithServerInterceptors(interceptors ...grpc.UnaryServerInterceptor) ServerOption {
-	return func(o *ServerOptions) {
-		o.interceptor = middleware.ChainServerInerceptor(interceptors...)
-	}
-}
-
 // Server Server
 type Server interface {
-	ListenAndServe() error
+	Start() error
 	Stop(ctx context.Context) error
-	RegisterService(sd *grpc.ServiceDesc, ss interface{})
+	RegisterGRPC(sd *grpc.ServiceDesc, ss interface{}, interceptors ...interceptor.ServerInterceptor)
+	Handle(path string, handler interceptor.MethodHandler, interceptors ...interceptor.ServerInterceptor)
+	WithCodec(codec Codec) Server // in case of partial codec
 }
 
 type server struct {
-	options *ServerOptions
+	addr    string
+	server  *http.Server
+	options ServerOptions
 }
 
 // NewServer NewServer
-func NewServer(opts ...ServerOption) Server {
+func NewServer(addr string, opts ...ServerOption) Server {
 	options := defaultServerOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
-	options.httpServer.Handler = options.router.HandleNotFound(options.httpServer.Handler)
 	return &server{
-		options: &options,
+		addr: addr,
+		server: &http.Server{
+			Addr:    addr,
+			Handler: options.router,
+		},
+		options: options,
 	}
 }
 
-func (s *server) ListenAndServe() error {
-	s.options.httpServer.Handler = s.options.router
-	log.WithField("addr", s.options.httpServer.Addr).
-		Info("start serving")
-	if err := s.options.httpServer.ListenAndServe(); err != nil &&
-		err != http.ErrServerClosed {
+// Start Start
+func (s *server) Start() error {
+	if err := s.server.ListenAndServe(); err != nil {
 		return errorsx.Trace(err)
 	}
 	return nil
 }
 
+// Stop Stop
 func (s *server) Stop(ctx context.Context) error {
-	log.WithField("addr", s.options.httpServer.Addr).
-		Info("stop serving")
-	if err := s.options.httpServer.Shutdown(ctx); err != nil {
+	if err := s.server.Shutdown(ctx); err != nil {
 		return errorsx.Trace(err)
 	}
 	return nil
 }
 
-func (s *server) RegisterService(sd *grpc.ServiceDesc, ss interface{}) {
-	s.registerHTTPService(sd, ss)
-}
-
-func (s *server) registerHTTPService(sd *grpc.ServiceDesc, ss interface{}) {
+// RegisterGRPC RegisterGRPC
+func (s *server) RegisterGRPC(sd *grpc.ServiceDesc, ss interface{}, interceptors ...interceptor.ServerInterceptor) {
 	for _, method := range sd.Methods {
-		httpMethod := "/" + sd.ServiceName + "/" + method.MethodName
-		s.options.router.Handle(httpMethod, &httpMethodHandler{
-			server:  s,
-			service: ss,
-			handler: methodHandler(method.Handler),
-		})
+		path := "/" + sd.ServiceName + "/" + method.MethodName
+		handler := gprcMethodDescToMethodHandler(method, ss)
+		s.Handle(path, handler, interceptors...)
 	}
 }
 
-type methodHandler func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error)
-
-type httpMethodHandler struct {
-	server  *server
-	service interface{}
-	handler methodHandler
+// Handle Handle
+func (s *server) Handle(path string, handler interceptor.MethodHandler, interceptors ...interceptor.ServerInterceptor) {
+	wrappedHandler := s.wrapHandler(handler, interceptors...)
+	s.options.router.Handle(path, wrappedHandler)
 }
 
-func (h *httpMethodHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ctx := req.Context()
-	traceID := log.GenTraceID()
-	ctx = log.ContextWithTraceID(ctx, traceID)
-	req = req.WithContext(ctx)
-	w.Header().Set("traceID", traceID)
-	reqData, reqBody, err := httpx.DrainBody(req.Body)
-	if err != nil {
-		log.ErrorContext(ctx, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "failed to read reqbody")
-		return
-	}
-	log.WithField("reqData", string(reqData)).
-		InfoContext(ctx, "recv req")
-
-	req.Body = reqBody
-	start := time.Now()
-
-	reqDec := requestDecoder(ctx, req.Body)
-	resp, err := h.handler(h.service, ctx, reqDec, h.server.options.interceptor)
-	if err != nil {
-		log.ErrorContext(ctx, err)
-		code := errorsx.Code(err)
-		w.Header().Add("rpccode", strconv.Itoa(code))
-		w.Header().Add("rpcmsg", err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	elapsed := time.Now().Sub(start).Milliseconds()
-	respData, err := json.Marshal(resp)
-	if err != nil {
-		log.ErrorContext(ctx, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "failed to read reqbody")
-		return
-	}
-	log.WithField("respData", string(respData)).
-		WithField("elapsed", elapsed).
-		InfoContext(ctx, "finish req")
-	if _, err := w.Write(respData); err != nil {
-		log.ErrorContext(ctx, err)
-		return
-	}
-}
-
-func requestDecoder(ctx context.Context, r io.Reader) func(interface{}) error {
-	return func(v interface{}) error {
-		if err := json.NewDecoder(r).Decode(v); err != nil {
-			return err
+func (s *server) wrapHandler(h interceptor.MethodHandler, interceptors ...interceptor.ServerInterceptor) http.HandlerFunc {
+	interceptor := interceptor.ChainServerInerceptor(append(s.options.interceptors, interceptors...)...)
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		traceID := r.Header.Get("traceID")
+		ctx = log.ContextWithTraceID(ctx, traceID)
+		codec := serverCodecFactory(ctx, r.Body, w, s.options.codec)
+		ctx = ContextWithIncomingMetadata(ctx, Metadata(r.Header))
+		if err := s.handle(ctx, codec, h, interceptor); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
-		return nil
+	}
+}
+
+func (s *server) handle(ctx context.Context, codec ServerCodec, h interceptor.MethodHandler, interceptor interceptor.ServerInterceptor) error {
+	gotResp, err := h(ctx, codec.Decode, interceptor)
+	needWrap := isRespNeedWrap(gotResp)
+	if err != nil {
+		log.ErrorContext(ctx, err)
+		if !needWrap {
+			return errorsx.Trace(err)
+		}
+		code := errorsx.Code(err)
+		msg := err.Error()
+		gotResp = respObj{
+			Code: code,
+			Msg:  msg,
+		}
+		goto ret
+	}
+	if needWrap {
+		gotResp = respObj{
+			Code: 0,
+			Msg:  "success",
+			Data: gotResp,
+		}
+	}
+ret:
+	if err := codec.Encode(gotResp); err != nil {
+		return errorsx.Trace(err)
+	}
+	return nil
+}
+
+// WithCodec WithCodec
+func (s *server) WithCodec(codec Codec) Server {
+	options := s.options
+	options.codec = codec
+	return &server{
+		addr:    s.addr,
+		server:  s.server,
+		options: options,
+	}
+}
+
+func gprcMethodDescToMethodHandler(method grpc.MethodDesc, ss interface{}) interceptor.MethodHandler {
+	return func(ctx context.Context, dec func(interface{}) error, intr interceptor.ServerInterceptor) (interface{}, error) {
+		grpcInterceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+			resp, err := intr(ctx, req, interceptor.ServerHandler(handler))
+			if err != nil {
+				return nil, errorsx.Trace(err)
+			}
+			return resp, nil
+		}
+		resp, err := method.Handler(ss, ctx, dec, grpcInterceptor)
+		if err != nil {
+			return nil, errorsx.Trace(err)
+		}
+		return resp, nil
 	}
 }

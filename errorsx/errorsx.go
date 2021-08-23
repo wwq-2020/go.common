@@ -234,6 +234,16 @@ func CanAs(err error) bool {
 	return As(err, &se)
 }
 
+// Replace Replace
+func Replace(raw, err error) error {
+	se, ok := raw.(*stackError)
+	if !ok {
+		return trace(err, UnknownCode, nil)
+	}
+	se.err = err
+	return se
+}
+
 // CodeIs CodeIs
 func CodeIs(err error, code int) bool {
 	se, ok := err.(*stackError)
@@ -249,23 +259,36 @@ func Code(err error) int {
 	return se.Code()
 }
 
-// Replace Replace
-func Replace(raw, err error) error {
-	se, ok := raw.(*stackError)
-	if !ok {
-		return err
-	}
-	se.err = err
-	return se
-}
-
 // ReplaceCode ReplaceCode
 func ReplaceCode(raw error, code int) error {
 	se, ok := raw.(*stackError)
 	if !ok {
-		return raw
+		return trace(raw, code, nil)
 	}
 	se.code = code
+	return se
+}
+
+// ReplaceCodeWithFields ReplaceCodeWithFields
+func ReplaceCodeWithFields(raw error, code int, fields stack.Fields) error {
+	se, ok := raw.(*stackError)
+	if !ok {
+		return trace(raw, code, fields)
+	}
+	se.code = code
+	se.fields = se.fields.Merge(fields)
+	return se
+}
+
+// ReplaceCodeWithField ReplaceCodeWithField
+func ReplaceCodeWithField(raw error, code int, key, value string) error {
+	se, ok := raw.(*stackError)
+	if !ok {
+		fields := stack.New().Set(key, value)
+		return trace(raw, code, fields)
+	}
+	se.code = code
+	se.fields.Set(key, value)
 	return se
 }
 
@@ -285,5 +308,27 @@ func ReplaceTip(raw error, tip string) error {
 		return errors.New(tip)
 	}
 	se.tip = tip
+	return se
+}
+
+// ReplaceTipWithFields ReplaceTipWithFields
+func ReplaceTipWithFields(raw error, tip string, fields stack.Fields) error {
+	se, ok := raw.(*stackError)
+	if !ok {
+		return NewWithFields(tip, fields)
+	}
+	se.tip = tip
+	se.fields = se.fields.Merge(fields)
+	return se
+}
+
+// ReplaceTipWithField ReplaceTipWithField
+func ReplaceTipWithField(raw error, tip, key, value string) error {
+	se, ok := raw.(*stackError)
+	if !ok {
+		return NewWithField(tip, key, value)
+	}
+	se.tip = tip
+	se.fields.Set(key, value)
 	return se
 }
