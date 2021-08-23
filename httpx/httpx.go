@@ -39,31 +39,29 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 		opt(&options)
 	}
 	operationName := method + "." + url
-	span, ctx := startSpanFromTracingOptions(ctx, operationName, options.tracingOptions)
-	defer span.Finish(&err)
+	stack := stack.New()
+	span, ctx := tracing.StartSpan(ctx, operationName, append(defaultTracingOptions.StartSpanOptions, tracing.Root(options.tracingOptions.Root))...)
+	defer span.FinishWithFields(&err, stack)
 
-	stack := stack.New().
-		Set("httpmethod", method).
+	ctx = log.ContextEnsureTraceIDWithGen(ctx, span.TraceID)
+	stack.Set("httpmethod", method).
 		Set("url", url)
-	span.WithFields(stack)
+
 	var reqBody io.Reader
-	var reqData []byte
 	if req != nil {
-		var err error
-		reqData, err = options.codec.Encode(req)
+		reqData, err := options.codec.Encode(req)
 		if err != nil {
 			return errorsx.TraceWithFields(err, stack)
 		}
 		reqDataStr := string(reqData)
 		stack.Set("reqData", reqDataStr)
-		span.WithField("reqData", reqDataStr)
 		reqBody = bytes.NewReader(reqData)
 	}
 	httpReq, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
 		return errorsx.TraceWithFields(err, stack)
 	}
-	ctx = log.ContextEnsureTraceID(ctx)
+
 	httpReq = httpReq.WithContext(ctx)
 	if options.reqInterceptor != nil {
 		if err := options.reqInterceptor(httpReq); err != nil {
@@ -86,8 +84,6 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	elapsed := time.Now().Sub(start).Milliseconds()
 	respDataStr := string(respData)
 	stack.Set("respData", respDataStr)
-	span.WithField("respData", respDataStr).
-		WithField("elapsed", elapsed)
 	log.WithField("respData", respDataStr).
 		WithField("elapsed", elapsed).
 		InfoContext(ctx, "invoke finish")
@@ -105,11 +101,4 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	}
 
 	return nil
-}
-
-func startSpanFromTracingOptions(ctx context.Context, operationName string, tracingOptions TracingOptions) (tracing.Span, context.Context) {
-	if tracingOptions.RootSpan {
-		return tracing.StartSpan(ctx, operationName)
-	}
-	return tracing.StartSpanFromContext(ctx, operationName, tracingOptions.StartSpanOptions...)
 }

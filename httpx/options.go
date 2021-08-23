@@ -21,7 +21,7 @@ type Options struct {
 // TracingOptions TracingOptions
 type TracingOptions struct {
 	StartSpanOptions []tracing.StartSpanOption
-	RootSpan         bool
+	Root             bool
 }
 
 var defaultOptions = Options{
@@ -32,7 +32,7 @@ var defaultOptions = Options{
 }
 
 var defaultTracingOptions = TracingOptions{
-	RootSpan: true,
+	Root: true,
 }
 
 // WithCodec WithCodec

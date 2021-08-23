@@ -26,9 +26,14 @@ func ContextWithTraceIDWithFun(ctx context.Context, fun func() string) context.C
 
 // ContextEnsureTraceID ContextEnsureTraceID
 func ContextEnsureTraceID(ctx context.Context) context.Context {
+	return ContextEnsureTraceIDWithGen(ctx, GenTraceID)
+}
+
+// ContextEnsureTraceIDWithGen ContextEnsureTraceIDWithGen
+func ContextEnsureTraceIDWithGen(ctx context.Context, fun func() string) context.Context {
 	traceID := TraceIDFromContext(ctx)
 	if traceID == "" {
-		return ContextWithTraceIDWithFun(ctx, GenTraceID)
+		return ContextWithTraceIDWithFun(ctx, fun)
 	}
 	return ctx
 }

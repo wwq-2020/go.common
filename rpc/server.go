@@ -7,6 +7,7 @@ import (
 	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/log"
 	"github.com/wwq-2020/go.common/rpc/interceptor"
+	"github.com/wwq-2020/go.common/tracing"
 	"google.golang.org/grpc"
 )
 
@@ -77,10 +78,16 @@ func (s *server) wrapHandler(h interceptor.MethodHandler, interceptors ...interc
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		traceID := r.Header.Get("traceID")
+		operationName := r.Method + "." + r.URL.Path
+		span, ctx := tracing.StartSpanFromHTTPReq(operationName, r)
+		var err error
+		defer span.Finish(&err)
+
 		ctx = log.ContextWithTraceID(ctx, traceID)
 		codec := serverCodecFactory(ctx, r.Body, w, s.options.codec)
 		ctx = ContextWithIncomingMetadata(ctx, Metadata(r.Header))
-		if err := s.handle(ctx, codec, h, interceptor); err != nil {
+		err = s.handle(ctx, codec, h, interceptor)
+		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
