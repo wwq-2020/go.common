@@ -22,6 +22,7 @@ type Options struct {
 type TracingOptions struct {
 	StartSpanOptions []tracing.StartSpanOption
 	Root             bool
+	OperationName    string
 }
 
 var defaultOptions = Options{
