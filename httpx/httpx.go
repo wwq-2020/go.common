@@ -44,6 +44,7 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 		operationName = tracingOptions.OperationName
 	}
 	stack := stack.New()
+
 	span, ctx := tracing.StartSpan(ctx, operationName, append(tracingOptions.StartSpanOptions, tracing.Root(tracingOptions.Root))...)
 	defer span.FinishWithFields(&err, stack)
 	ctx = log.ContextEnsureTraceIDWithGen(ctx, span.TraceID)
@@ -73,8 +74,6 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	}
 	start := time.Now()
 	stack.Set("invokeStart", start.Format("2006-01-02 15:04:05"))
-	log.WithFields(stack).
-		InfoContext(ctx, "start invoke")
 
 	httpResp, err := options.client.Do(httpReq)
 	if err != nil {
@@ -91,10 +90,7 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	stack.Set("respData", respDataStr).
 		Set("elapsed", elapsed).
 		Set("invokeFinish", end.Format("2006-01-02 15:04:05"))
-	log.WithFields(stack).
-		InfoContext(ctx, "invoke finish")
 	httpResp.Body = respBody
-
 	if options.respInterceptor != nil {
 		if err := options.respInterceptor(httpResp); err != nil {
 			return errorsx.TraceWithFields(err, stack)

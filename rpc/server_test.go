@@ -8,6 +8,7 @@ import (
 
 	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/rpc"
+	"github.com/wwq-2020/go.common/rpc/interceptor"
 )
 
 type respWrap struct {
@@ -28,7 +29,7 @@ func (r *resp) UnWrap() bool {
 }
 
 func TestServer(t *testing.T) {
-	s := rpc.NewServer(":8083")
+	s := rpc.NewServer("demo", ":8083")
 
 	type req struct {
 		Data string
@@ -38,7 +39,7 @@ func TestServer(t *testing.T) {
 		return &resp{req.Data}, nil
 	}
 
-	wrapHandler := func(ctx context.Context, dec func(interface{}) error, interceptor rpc.ServerInterceptor) (interface{}, error) {
+	wrapHandler := func(ctx context.Context, dec func(interface{}) error, interceptor interceptor.ServerInterceptor) (interface{}, error) {
 		in := &req{}
 		if err := dec(in); err != nil {
 			return nil, errorsx.Trace(err)
@@ -56,7 +57,7 @@ func TestServer(t *testing.T) {
 		}
 		return resp, nil
 	}
-	interceptor := func(ctx context.Context, req interface{}, handler rpc.ServerHandler) (resp interface{}, err error) {
+	interceptor := func(ctx context.Context, req interface{}, handler interceptor.ServerHandler) (resp interface{}, err error) {
 		ctx = context.WithValue(ctx, "aa", 1)
 		return handler(ctx, req)
 	}
@@ -66,9 +67,9 @@ func TestServer(t *testing.T) {
 	go s.Start()
 
 	time.Sleep(time.Second)
-	c := rpc.NewClient("oms-fe")
+	c := rpc.NewClient("127.0.0.1:8083")
 	respObj := &resp{}
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
 	defer cancel()
-	fmt.Println(c.Invoke(ctx, "/a", req{Data: "xx"}, respObj), respObj)
+	fmt.Println(c.Invoke(ctx, "/", req{Data: "xx"}, respObj), respObj)
 }

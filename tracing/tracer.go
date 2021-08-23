@@ -94,7 +94,13 @@ func (s *span) InjectToHTTPReq(httpReq *http.Request) {
 }
 
 func (s *span) TraceID() string {
-	jaegerSpan := s.opentracingSpan.(*jaeger.Span)
+	if s.opentracingSpan == nil {
+		return log.GenTraceID()
+	}
+	jaegerSpan, ok := s.opentracingSpan.(*jaeger.Span)
+	if !ok {
+		return log.GenTraceID()
+	}
 	return jaegerSpan.SpanContext().TraceID().String()
 }
 

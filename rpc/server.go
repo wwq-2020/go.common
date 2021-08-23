@@ -1,12 +1,16 @@
 package rpc
 
 import (
+	"bytes"
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/wwq-2020/go.common/errorsx"
+	"github.com/wwq-2020/go.common/httpx"
 	"github.com/wwq-2020/go.common/log"
 	"github.com/wwq-2020/go.common/rpc/interceptor"
+	"github.com/wwq-2020/go.common/stack"
 	"github.com/wwq-2020/go.common/tracing"
 	"google.golang.org/grpc"
 )
@@ -21,18 +25,20 @@ type Server interface {
 }
 
 type server struct {
+	name    string
 	addr    string
 	server  *http.Server
 	options ServerOptions
 }
 
 // NewServer NewServer
-func NewServer(addr string, opts ...ServerOption) Server {
+func NewServer(name, addr string, opts ...ServerOption) Server {
 	options := defaultServerOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 	return &server{
+		name: name,
 		addr: addr,
 		server: &http.Server{
 			Addr:    addr,
@@ -77,20 +83,41 @@ func (s *server) wrapHandler(h interceptor.MethodHandler, interceptors ...interc
 	interceptor := interceptor.ChainServerInerceptor(append(s.options.interceptors, interceptors...)...)
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		traceID := r.Header.Get("traceID")
-		operationName := r.Method + "." + r.URL.Path
-		span, ctx := tracing.StartSpanFromHTTPReq(operationName, r)
+		span, ctx := tracing.HTTPServerStartSpan(s.name, r)
+		ctx = log.ContextEnsureTraceIDWithGen(ctx, span.TraceID)
+		stack := stack.New().
+			Set("method", r.Method).
+			Set("path", r.URL.Path)
 		var err error
-		defer span.Finish(&err)
-
-		ctx = log.ContextWithTraceID(ctx, traceID)
-		codec := serverCodecFactory(ctx, r.Body, w, s.options.codec)
-		ctx = ContextWithIncomingMetadata(ctx, Metadata(r.Header))
-		err = s.handle(ctx, codec, h, interceptor)
+		defer span.FinishWithFields(&err, stack)
+		reqData, reqBody, err := httpx.DrainBody(r.Body)
 		if err != nil {
+			log.WithFields(stack).
+				ErrorContext(ctx, err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		start := time.Now()
+		stack.Set("reqData", string(reqData)).
+			Set("handleStart", start.Format("2006-01-02 15:04:05"))
+		log.WithFields(stack).
+			InfoContext(ctx, "recv req")
+		r.Body = reqBody
+		rw := &responseWriter{ResponseWriter: w, buffer: bytes.NewBuffer(nil)}
+		codec := serverCodecFactory(ctx, r.Body, rw, s.options.codec)
+		ctx = ContextWithIncomingMetadata(ctx, Metadata(r.Header))
+		err = s.handle(ctx, codec, h, interceptor)
+		if err != nil {
+			log.ErrorContext(ctx, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		end := time.Now()
+		stack.Set("respData", string(rw.buffer.Bytes())).
+			Set("handleEnd", end.Format("2006-01-02 15:04:05"))
+		log.WithField("respData", string(rw.buffer.Bytes())).
+			WithField("handleEnd", end.Format("2006-01-02 15:04:05")).
+			InfoContext(ctx, "finish req")
 	}
 }
 
@@ -150,4 +177,18 @@ func gprcMethodDescToMethodHandler(method grpc.MethodDesc, ss interface{}) inter
 		}
 		return resp, nil
 	}
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	buffer *bytes.Buffer
+}
+
+func (rw *responseWriter) Write(data []byte) (int, error) {
+	n, err := rw.ResponseWriter.Write(data)
+	if err != nil {
+		return 0, errorsx.Trace(err)
+	}
+	rw.buffer.Write(data[:n])
+	return n, nil
 }

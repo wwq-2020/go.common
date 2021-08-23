@@ -52,3 +52,58 @@ func (fs fields) KVsSlice() []interface{} {
 func FromKVs(kvs map[string]interface{}) Fields {
 	return fields(kvs)
 }
+
+type multi struct {
+	others []Fields
+	self   Fields
+}
+
+// Multi Multi
+func Multi(others ...Fields) Fields {
+	return &multi{
+		others: others,
+		self:   New(),
+	}
+}
+
+func (fs multi) Merge(fs2 Fields) Fields {
+	newFS := New()
+	for k, v := range fs.KVs() {
+		newFS.Set(k, v)
+	}
+	for k, v := range fs2.KVs() {
+		newFS.Set(k, v)
+	}
+	return newFS
+}
+
+func (fs multi) Set(key string, val interface{}) Fields {
+	fs.self.Set(key, val)
+	return fs
+}
+
+func (fs multi) KVs() map[string]interface{} {
+	kvs := make(map[string]interface{})
+	for _, other := range fs.others {
+		for key, val := range other.KVs() {
+			kvs[key] = val
+		}
+	}
+	for key, val := range fs.self.KVs() {
+		kvs[key] = val
+	}
+	return kvs
+}
+
+func (fs multi) KVsSlice() []interface{} {
+	kvsSlice := make([]interface{}, 0, 20)
+	for _, other := range fs.others {
+		for key, val := range other.KVs() {
+			kvsSlice = append(kvsSlice, key, val)
+		}
+	}
+	for key, val := range fs.self.KVs() {
+		kvsSlice = append(kvsSlice, key, val)
+	}
+	return kvsSlice
+}

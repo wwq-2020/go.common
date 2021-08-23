@@ -8,7 +8,6 @@ import (
 
 	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/httpx"
-	"github.com/wwq-2020/go.common/log"
 )
 
 // Codec Codec
@@ -54,8 +53,6 @@ func (c *serverCodec) Decode(obj interface{}) error {
 	if err != nil {
 		return errorsx.TraceWithCode(err, http.StatusBadRequest)
 	}
-	log.WithField("reqData", string(reqData)).
-		InfoContext(c.ctx, "got reqData")
 	if err := c.codec.Decode(reqData, obj); err != nil {
 		return errorsx.ReplaceCode(err, http.StatusBadRequest)
 	}
@@ -67,8 +64,6 @@ func (c *serverCodec) Encode(obj interface{}) error {
 	if err != nil {
 		return errorsx.Trace(err)
 	}
-	log.WithField("respData", string(respData)).
-		InfoContext(c.ctx, "send respData")
 	if _, err := c.w.Write(respData); err != nil {
 		return errorsx.Trace(err)
 	}
