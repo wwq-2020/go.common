@@ -42,7 +42,6 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	stack := stack.New()
 	span, ctx := tracing.StartSpan(ctx, operationName, append(defaultTracingOptions.StartSpanOptions, tracing.Root(options.tracingOptions.Root))...)
 	defer span.FinishWithFields(&err, stack)
-
 	ctx = log.ContextEnsureTraceIDWithGen(ctx, span.TraceID)
 	stack.Set("httpmethod", method).
 		Set("url", url)

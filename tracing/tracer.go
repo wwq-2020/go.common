@@ -104,7 +104,7 @@ func (s *span) Finish(err *error) {
 		fields = append(fields, opentracinglog.String("status", "failed"))
 		fields = append(fields, opentracinglog.String("error", (*err).Error()))
 		s.opentracingSpan.LogFields(fields...)
-		s.opentracingSpan.LogKV(s.stack.KVsSlice()...)
+		s.opentracingSpan.LogKV(s.stack.Merge(errorsx.Fields(*err)).KVsSlice()...)
 		s.opentracingSpan.Finish()
 		return
 	}
@@ -120,7 +120,7 @@ func (s *span) FinishWithFields(err *error, stack stack.Fields) {
 		fields = append(fields, opentracinglog.String("status", "failed"))
 		fields = append(fields, opentracinglog.String("error", (*err).Error()))
 		s.opentracingSpan.LogFields(fields...)
-		s.opentracingSpan.LogKV(s.stack.Merge(stack).KVsSlice()...)
+		s.opentracingSpan.LogKV(s.stack.Merge(errorsx.Fields(*err)).Merge(stack).KVsSlice()...)
 		s.opentracingSpan.Finish()
 		return
 	}
