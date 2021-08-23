@@ -157,7 +157,8 @@ func StartSpan(ctx context.Context, operationName string) (Span, context.Context
 }
 
 // StartSpanFromHTTPReq StartSpanFromHTTPReq
-func StartSpanFromHTTPReq(ctx context.Context, operationName string, httpReq *http.Request) (Span, context.Context) {
+func StartSpanFromHTTPReq(operationName string, httpReq *http.Request) (Span, context.Context) {
+	ctx := httpReq.Context()
 	parentSpanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(httpReq.Header))
 	if err == nil {
 		opentracingSpan := opentracing.GlobalTracer().StartSpan(operationName, opentracing.ChildOf(parentSpanContext))
