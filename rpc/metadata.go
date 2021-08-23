@@ -8,6 +8,11 @@ import (
 // Metadata Metadata
 type Metadata map[string][]string
 
+// Clone Clone
+func (m Metadata) Clone() Metadata {
+	return Metadata(http.Header(m).Clone())
+}
+
 // Add Add
 func (m Metadata) Add(k, v string) Metadata {
 	http.Header(m).Add(k, v)

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/wwq-2020/go.common/errorsx"
-	"github.com/wwq-2020/go.common/httpx"
+	"github.com/wwq-2020/go.common/httputilx"
 	"github.com/wwq-2020/go.common/log"
 	"github.com/wwq-2020/go.common/rpc/interceptor"
 	"github.com/wwq-2020/go.common/stack"
@@ -29,6 +29,7 @@ type server struct {
 	addr    string
 	server  *http.Server
 	options ServerOptions
+	router  Router
 }
 
 // NewServer NewServer
@@ -37,12 +38,14 @@ func NewServer(name, addr string, opts ...ServerOption) Server {
 	for _, opt := range opts {
 		opt(&options)
 	}
+	router := options.routerFactory(name)
 	return &server{
-		name: name,
-		addr: addr,
+		name:   name,
+		addr:   addr,
+		router: router,
 		server: &http.Server{
 			Addr:    addr,
-			Handler: options.router,
+			Handler: router,
 		},
 		options: options,
 	}
@@ -76,21 +79,19 @@ func (s *server) RegisterGRPC(sd *grpc.ServiceDesc, ss interface{}, interceptors
 // Handle Handle
 func (s *server) Handle(path string, handler interceptor.MethodHandler, interceptors ...interceptor.ServerInterceptor) {
 	wrappedHandler := s.wrapHandler(handler, interceptors...)
-	s.options.router.Handle(path, wrappedHandler)
+	s.router.Handle(path, wrappedHandler)
 }
 
 func (s *server) wrapHandler(h interceptor.MethodHandler, interceptors ...interceptor.ServerInterceptor) http.HandlerFunc {
 	interceptor := interceptor.ChainServerInerceptor(append(s.options.interceptors, interceptors...)...)
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		span, ctx := tracing.HTTPServerStartSpan(s.name, r)
-		ctx = log.ContextEnsureTraceIDWithGen(ctx, span.TraceID)
+		span, ctx := tracing.HTTPServerStartSpan(r.Context(), s.name+"-serve", r, w)
 		stack := stack.New().
-			Set("method", r.Method).
+			Set("httpmethod", r.Method).
 			Set("path", r.URL.Path)
 		var err error
 		defer span.FinishWithFields(&err, stack)
-		reqData, reqBody, err := httpx.DrainBody(r.Body)
+		reqData, reqBody, err := httputilx.DrainBody(r.Body)
 		if err != nil {
 			log.WithFields(stack).
 				ErrorContext(ctx, err)
@@ -159,6 +160,7 @@ func (s *server) WithCodec(codec Codec) Server {
 		addr:    s.addr,
 		server:  s.server,
 		options: options,
+		router:  s.router,
 	}
 }
 

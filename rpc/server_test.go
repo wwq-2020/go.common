@@ -9,6 +9,7 @@ import (
 	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/rpc"
 	"github.com/wwq-2020/go.common/rpc/interceptor"
+	"github.com/wwq-2020/go.common/tracing"
 )
 
 type respWrap struct {
@@ -29,11 +30,13 @@ func (r *resp) UnWrap() bool {
 }
 
 func TestServer(t *testing.T) {
-	s := rpc.NewServer("demo", ":8083")
+	s := rpc.NewServer("aa", ":8083")
 
 	type req struct {
 		Data string
 	}
+	cleanup := tracing.MustInitGlobalTracer("aa", "http://127.0.0.1:14268/api/traces?format=jaeger.thrift", 1)
+	defer cleanup()
 
 	handler := func(ctx context.Context, req *req) (*resp, error) {
 		return &resp{req.Data}, nil
@@ -67,9 +70,10 @@ func TestServer(t *testing.T) {
 	go s.Start()
 
 	time.Sleep(time.Second)
-	c := rpc.NewClient("127.0.0.1:8083")
+	c := rpc.NewClient("aa", "127.0.0.1:8083")
 	respObj := &resp{}
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
 	defer cancel()
 	fmt.Println(c.Invoke(ctx, "/", req{Data: "xx"}, respObj), respObj)
+	time.Sleep(time.Second * 2)
 }

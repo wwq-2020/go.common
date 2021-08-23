@@ -3,6 +3,7 @@ package tracing
 import (
 	"context"
 	"net/http"
+	"net/url"
 
 	"github.com/opentracing/opentracing-go"
 	opentracinglog "github.com/opentracing/opentracing-go/log"
@@ -14,9 +15,14 @@ import (
 	"github.com/wwq-2020/go.common/stack"
 )
 
+var (
+	noopTracer = opentracing.NoopTracer{}
+)
+
 // consts
 const (
 	DefaultSampleRate = 0.1
+	TraceIDName       = "traceid"
 )
 
 // MustInitGlobalTracer MustInitGlobalTracer
@@ -45,7 +51,7 @@ func InitGlobalTracer(serviceName, endpoint string, sampleRate float64) (func(),
 		},
 		Gen128Bit: true,
 		Headers: &jaeger.HeadersConfig{
-			TraceContextHeaderName: "TraceID",
+			TraceContextHeaderName: TraceIDName,
 		},
 	}
 	closer, err := cfg.InitGlobalTracer(
@@ -70,8 +76,8 @@ type Span interface {
 	FinishWithFields(err *error, fields stack.Fields)
 	WithField(string, interface{}) Span
 	WithFields(stack.Fields) Span
-	TraceID() string
 	InjectToHTTPReq(*http.Request)
+	InjectToHTTPResponse(ctx context.Context, w http.ResponseWriter)
 }
 
 type span struct {
@@ -86,22 +92,26 @@ func newSpan(opentracingSpan opentracing.Span) Span {
 	}
 }
 
-func (s *span) InjectToHTTPReq(httpReq *http.Request) {
-	ctx := httpReq.Context()
-	if err := opentracing.GlobalTracer().Inject(s.opentracingSpan.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(httpReq.Header)); err != nil {
-		log.ErrorContext(ctx, err)
+func (s *span) InjectToHTTPResponse(ctx context.Context, w http.ResponseWriter) {
+	tracer := opentracing.GlobalTracer()
+	traceID := log.TraceIDFromContext(ctx)
+	if tracer != noopTracer {
+		traceID = traceIDFromOpentracingSpan(s.opentracingSpan)
 	}
+	w.Header().Set(TraceIDName, traceID)
 }
 
-func (s *span) TraceID() string {
-	if s.opentracingSpan == nil {
-		return log.GenTraceID()
+func (s *span) InjectToHTTPReq(httpReq *http.Request) {
+	ctx := httpReq.Context()
+	tracer := opentracing.GlobalTracer()
+	if tracer == noopTracer {
+		traceID := log.TraceIDFromContext(ctx)
+		httpReq.Header.Set(TraceIDName, traceID)
+		return
 	}
-	jaegerSpan, ok := s.opentracingSpan.(*jaeger.Span)
-	if !ok {
-		return log.GenTraceID()
+	if err := tracer.Inject(s.opentracingSpan.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(httpReq.Header)); err != nil {
+		log.ErrorContext(ctx, err)
 	}
-	return jaegerSpan.SpanContext().TraceID().String()
 }
 
 func (s *span) Finish(err *error) {
@@ -134,6 +144,7 @@ func (s *span) FinishWithFields(err *error, stack stack.Fields) {
 	s.opentracingSpan.LogFields(fields...)
 	s.opentracingSpan.LogKV(s.stack.Merge(stack).KVsSlice()...)
 	s.opentracingSpan.Finish()
+
 }
 
 func (s *span) WithField(key string, value interface{}) Span {
@@ -185,11 +196,12 @@ func startSpan(ctx context.Context, operationName string, opts ...StartSpanOptio
 	for _, opt := range opts {
 		opt(&options)
 	}
+	tracer := opentracing.GlobalTracer()
+
 	if options.root {
-		span := opentracing.GlobalTracer().StartSpan(operationName)
+		span := tracer.StartSpan(operationName)
 		return span, opentracing.ContextWithSpan(ctx, span)
 	}
-	tracer := opentracing.GlobalTracer()
 	parentSpan := opentracing.SpanFromContext(ctx)
 	if parentSpan == nil {
 		span := tracer.StartSpan(operationName)
@@ -214,16 +226,67 @@ func startSpan(ctx context.Context, operationName string, opts ...StartSpanOptio
 // StartSpan StartSpan
 func StartSpan(ctx context.Context, operationName string, opts ...StartSpanOption) (Span, context.Context) {
 	opentracingSpan, ctx := startSpan(ctx, operationName, opts...)
+	tracer := opentracing.GlobalTracer()
+	if tracer != noopTracer {
+		traceID := traceIDFromOpentracingSpan(opentracingSpan)
+		ctx = log.ContextWithTraceID(ctx, traceID)
+	}
 	return newSpan(opentracingSpan), ctx
 }
 
 // HTTPServerStartSpan HTTPServerStartSpan
-func HTTPServerStartSpan(operationName string, httpReq *http.Request) (Span, context.Context) {
-	ctx := httpReq.Context()
-	parentSpanContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(httpReq.Header))
-	if err == nil {
-		opentracingSpan := opentracing.GlobalTracer().StartSpan(operationName, opentracing.ChildOf(parentSpanContext))
-		return newSpan(opentracingSpan), opentracing.ContextWithSpan(ctx, opentracingSpan)
+func HTTPServerStartSpan(ctx context.Context, operationName string, httpReq *http.Request, w http.ResponseWriter) (Span, context.Context) {
+	tracer := opentracing.GlobalTracer()
+	if tracer == noopTracer {
+		traceID := parseTraceID(httpReq)
+		ctx = log.ContextWithTraceID(ctx, traceID)
 	}
-	return StartSpan(ctx, operationName, Root(true))
+	parentSpanContext, err := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(httpReq.Header))
+	if err == nil {
+		opentracingSpan := tracer.StartSpan(operationName, opentracing.ChildOf(parentSpanContext))
+		if tracer != noopTracer {
+			traceID := traceIDFromOpentracingSpan(opentracingSpan)
+			ctx = log.ContextWithTraceID(ctx, traceID)
+		}
+		span := newSpan(opentracingSpan)
+		span.InjectToHTTPResponse(ctx, w)
+		return span, opentracing.ContextWithSpan(ctx, opentracingSpan)
+	}
+	span, ctx := StartSpan(ctx, operationName, Root(true))
+	span.InjectToHTTPResponse(ctx, w)
+	return span, ctx
+}
+
+// HTTPClientStartSpan HTTPClientStartSpan
+func HTTPClientStartSpan(ctx context.Context, operationName string, httpReq *http.Request, opts ...StartSpanOption) (Span, context.Context) {
+	opentracingSpan, ctx := startSpan(ctx, operationName, opts...)
+	tracer := opentracing.GlobalTracer()
+	if tracer == noopTracer {
+		traceID := log.TraceIDFromContext(ctx)
+		httpReq.Header.Set(TraceIDName, traceID)
+	}
+	if err := tracer.Inject(opentracingSpan.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(httpReq.Header)); err != nil {
+		log.ErrorContext(ctx, err)
+	}
+	return newSpan(opentracingSpan), ctx
+}
+
+func parseTraceID(httpReq *http.Request) string {
+	val := httpReq.Header.Get(TraceIDName)
+	if v, err := url.QueryUnescape(val); err == nil {
+		val = v
+	}
+	if val == "" {
+		return log.GenTraceID()
+	}
+	spanContext, err := jaeger.ContextFromString(val)
+	if err == nil {
+		return spanContext.TraceID().String()
+	}
+	return val
+}
+
+func traceIDFromOpentracingSpan(opentracingSpan opentracing.Span) string {
+	jaegerSpan := opentracingSpan.(*jaeger.Span)
+	return jaegerSpan.SpanContext().TraceID().String()
 }

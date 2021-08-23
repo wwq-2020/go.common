@@ -6,9 +6,9 @@ import (
 
 // ServerOptions ServerOptions
 type ServerOptions struct {
-	codec        Codec
-	interceptors []interceptor.ServerInterceptor
-	router       Router
+	codec         Codec
+	interceptors  []interceptor.ServerInterceptor
+	routerFactory RouterFactory
 }
 
 // ServerOption ServerOption
@@ -16,9 +16,9 @@ type ServerOption func(*ServerOptions)
 
 var (
 	defaultServerOptions = ServerOptions{
-		codec:        JSONCodec(),
-		interceptors: []interceptor.ServerInterceptor{},
-		router:       NewRouter(),
+		codec:         JSONCodec(),
+		interceptors:  []interceptor.ServerInterceptor{},
+		routerFactory: NewRouter,
 	}
 )
 

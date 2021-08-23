@@ -2,23 +2,42 @@ package rpc
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"io/ioutil"
 	"net/http"
 
 	"github.com/wwq-2020/go.common/errorsx"
-	"github.com/wwq-2020/go.common/httpx"
 )
 
 // Codec Codec
-type Codec = httpx.Codec
-
-type jsonCodec struct {
-	r io.Reader
+type Codec interface {
+	Encode(interface{}) ([]byte, error)
+	Decode([]byte, interface{}) error
 }
 
+type jsonCodec struct{}
+
 // JSONCodec JSONCodec
-var JSONCodec = httpx.JSONCodec
+func JSONCodec() Codec {
+	return &jsonCodec{}
+}
+
+func (c *jsonCodec) Encode(obj interface{}) ([]byte, error) {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, errorsx.Trace(err)
+	}
+	return data, nil
+}
+
+func (c *jsonCodec) Decode(data []byte, obj interface{}) error {
+	err := json.Unmarshal(data, obj)
+	if err != nil {
+		return errorsx.Trace(err)
+	}
+	return nil
+}
 
 type respObj struct {
 	Code int         `json:"code"`

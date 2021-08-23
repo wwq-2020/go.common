@@ -1,4 +1,4 @@
-package httpx
+package httputilx
 
 import (
 	"bytes"
@@ -16,8 +16,4 @@ func DrainBody(src io.ReadCloser) ([]byte, io.ReadCloser, error) {
 		return nil, nil, errorsx.Trace(err)
 	}
 	return buf.Bytes(), ioutil.NopCloser(bytes.NewReader(buf.Bytes())), nil
-}
-
-func toByteStr() {
-
 }

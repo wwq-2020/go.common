@@ -3,9 +3,14 @@ package rpc
 import (
 	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/wwq-2020/go.common/errorsx"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 // Balancer Balancer
 type Balancer interface {
@@ -28,6 +33,9 @@ func (b *randomBalancer) Add(endpoint string) {
 	b.m.Lock()
 	defer b.m.Unlock()
 	b.endpoints = append(b.endpoints, endpoint)
+	rand.Shuffle(len(b.endpoints), func(i, j int) {
+		b.endpoints[j], b.endpoints[i] = b.endpoints[i], b.endpoints[j]
+	})
 }
 
 func (b *randomBalancer) Del(endpoint string) {
@@ -39,6 +47,9 @@ func (b *randomBalancer) Del(endpoint string) {
 			return
 		}
 	}
+	rand.Shuffle(len(b.endpoints), func(i, j int) {
+		b.endpoints[j], b.endpoints[i] = b.endpoints[i], b.endpoints[j]
+	})
 }
 
 func (b *randomBalancer) Pick() (string, error) {
@@ -47,8 +58,6 @@ func (b *randomBalancer) Pick() (string, error) {
 	if len(b.endpoints) == 0 {
 		return "", errorsx.New("no endpoint")
 	}
-	rand.Shuffle(len(b.endpoints), func(i, j int) {
-		b.endpoints[j], b.endpoints[i] = b.endpoints[i], b.endpoints[j]
-	})
-	return b.endpoints[0], nil
+	n := rand.Intn(len(b.endpoints))
+	return b.endpoints[n], nil
 }
