@@ -68,6 +68,7 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 		}
 	}
 	start := time.Now()
+	stack.Set("invokeStart", start.Format("2006-01-02 15:04:05"))
 	log.WithFields(stack).
 		InfoContext(ctx, "start invoke")
 
@@ -80,11 +81,13 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	if err != nil {
 		return errorsx.TraceWithFields(err, stack)
 	}
-	elapsed := time.Now().Sub(start).Milliseconds()
+	end := time.Now()
+	elapsed := end.Sub(start).Milliseconds()
 	respDataStr := string(respData)
-	stack.Set("respData", respDataStr)
-	log.WithField("respData", respDataStr).
-		WithField("elapsed", elapsed).
+	stack.Set("respData", respDataStr).
+		Set("elapsed", elapsed).
+		Set("invokeFinish", end.Format("2006-01-02 15:04:05"))
+	log.WithFields(stack).
 		InfoContext(ctx, "invoke finish")
 	httpResp.Body = respBody
 
