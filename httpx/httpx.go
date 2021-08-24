@@ -55,7 +55,7 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	if req != nil {
 		reqData, err := options.codec.Encode(req)
 		if err != nil {
-			return errorsx.TraceWithFields(err, stack)
+			return errorsx.Trace(err)
 		}
 		reqDataStr := string(reqData)
 		stack.Set("reqData", reqDataStr)
@@ -63,14 +63,14 @@ func do(ctx context.Context, method, url string, req, resp interface{}, opts ...
 	}
 	httpReq, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
-		return errorsx.TraceWithFields(err, stack)
+		return errorsx.Trace(err)
 	}
 	httpReq = httpReq.WithContext(ctx)
 	span.InjectToHTTPReq(httpReq)
 
 	if options.reqInterceptor != nil {
 		if err := options.reqInterceptor(httpReq); err != nil {
-			return errorsx.TraceWithFields(err, stack)
+			return errorsx.Trace(err)
 		}
 	}
 	start := time.Now()
