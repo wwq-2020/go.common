@@ -65,6 +65,7 @@ func NewServer(name string, conf *ServerConf, opts ...ServerOption) Server {
 	if conf == nil {
 		conf = defaultServerConf
 	}
+	conf.fill()
 	options := defaultServerOptions
 	for _, opt := range opts {
 		opt(&options)
