@@ -57,7 +57,7 @@ func (c *ServerConf) fill() {
 }
 
 var defaultServerConf = &ServerConf{
-	Addr: "8080",
+	Addr: "127.0.0.1:8080",
 }
 
 // NewServer NewServer
