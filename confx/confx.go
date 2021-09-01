@@ -125,6 +125,10 @@ func Walk(dest interface{}, tag string, walker Walker) error {
 
 func walk(t reflect.Type, v reflect.Value, ancestors []string, tag string, walker Walker) error {
 	if t.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			key := strings.Join(ancestors, ".")
+			return errorsx.TraceWithField(EmptyKey, "key", key)
+		}
 		t = t.Elem()
 	}
 	if v.Kind() == reflect.Ptr {
