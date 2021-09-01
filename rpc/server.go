@@ -3,17 +3,32 @@ package rpc
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/wwq-2020/go.common/errcode"
 	"github.com/wwq-2020/go.common/errorsx"
-	"github.com/wwq-2020/go.common/httputilx"
+	"github.com/wwq-2020/go.common/httpx"
 	"github.com/wwq-2020/go.common/log"
 	"github.com/wwq-2020/go.common/rpc/interceptor"
 	"github.com/wwq-2020/go.common/stack"
 	"github.com/wwq-2020/go.common/tracing"
 	"google.golang.org/grpc"
 )
+
+// consts
+const (
+	StatusCodeHeader string = "statuscode"
+	StatusMsgHeader  string = "statusmsg"
+)
+
+// Interceptor Interceptor
+type Interceptor interface {
+	Interceptor(ctx context.Context, req interface{}, handler interceptor.ServerHandler) (resp interface{}, err error)
+}
 
 // Server Server
 type Server interface {
@@ -32,20 +47,37 @@ type server struct {
 	router  Router
 }
 
+// ServerConf ServerConf
+type ServerConf struct {
+	Addr string `toml:"addr" yaml:"addr" json:"addr"`
+}
+
+func (c *ServerConf) fill() {
+
+}
+
+var defaultServerConf = &ServerConf{
+	Addr: "8080",
+}
+
 // NewServer NewServer
-func NewServer(name, addr string, opts ...ServerOption) Server {
+func NewServer(name string, conf *ServerConf, opts ...ServerOption) Server {
+	if conf == nil {
+		conf = defaultServerConf
+	}
 	options := defaultServerOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 	router := options.routerFactory(name)
+	wrappedHandler := wrapHTTPHandler(router)
 	return &server{
 		name:   name,
-		addr:   addr,
+		addr:   conf.Addr,
 		router: router,
 		server: &http.Server{
-			Addr:    addr,
-			Handler: router,
+			Addr:    conf.Addr,
+			Handler: wrappedHandler,
 		},
 		options: options,
 	}
@@ -72,7 +104,13 @@ func (s *server) RegisterGRPC(sd *grpc.ServiceDesc, ss interface{}, interceptors
 	for _, method := range sd.Methods {
 		path := "/" + sd.ServiceName + "/" + method.MethodName
 		handler := gprcMethodDescToMethodHandler(method, ss)
-		s.Handle(path, handler, interceptors...)
+
+		svcInterceptor, ok := ss.(Interceptor)
+		if !ok {
+			s.Handle(path, handler, interceptors...)
+			return
+		}
+		s.Handle(path, handler, append([]interceptor.ServerInterceptor{svcInterceptor.Interceptor}, interceptors...)...)
 	}
 }
 
@@ -84,41 +122,47 @@ func (s *server) Handle(path string, handler interceptor.MethodHandler, intercep
 
 func (s *server) wrapHandler(h interceptor.MethodHandler, interceptors ...interceptor.ServerInterceptor) http.HandlerFunc {
 	interceptor := interceptor.ChainServerInerceptor(append(s.options.interceptors, interceptors...)...)
-	return func(w http.ResponseWriter, r *http.Request) {
-		span, ctx := tracing.HTTPServerStartSpan(r.Context(), s.name+"-serve", r, w)
-		stack := stack.New().
-			Set("httpmethod", r.Method).
-			Set("path", r.URL.Path)
-		var err error
-		defer span.FinishWithFields(&err, stack)
-		reqData, reqBody, err := httputilx.DrainBody(r.Body)
-		if err != nil {
-			log.WithFields(stack).
-				ErrorContext(ctx, err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		start := time.Now()
-		stack.Set("reqData", string(reqData)).
-			Set("handleStart", start.Format("2006-01-02 15:04:05"))
-		log.WithFields(stack).
-			InfoContext(ctx, "recv req")
-		r.Body = reqBody
-		rw := &responseWriter{ResponseWriter: w, buffer: bytes.NewBuffer(nil)}
-		codec := serverCodecFactory(ctx, r.Body, rw, s.options.codec)
-		ctx = ContextWithIncomingMetadata(ctx, Metadata(r.Header))
-		err = s.handle(ctx, codec, h, interceptor)
+	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		codec := serverCodecFactory(req.Body, w, s.options.codec)
+		code := errcode.ErrCode_Ok
+		msg := "success"
+		gotResp, err := h(ctx, codec.Decode, interceptor)
+		needWrap := isRespNeedWrap(gotResp)
 		if err != nil {
 			log.ErrorContext(ctx, err)
-			w.WriteHeader(http.StatusInternalServerError)
+			if strings.Contains(err.Error(), "unexpected end of JSON input") {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			code = errorsx.Code(err)
+			msg = err.Error()
+			if !needWrap {
+				w.Header().Set(StatusCodeHeader, strconv.Itoa(int(code)))
+				w.Header().Set(StatusMsgHeader, msg)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			gotResp = respObj{
+				Code: code,
+				Msg:  msg,
+			}
+			goto ret
+		}
+		if needWrap {
+			gotResp = respObj{
+				Code: code,
+				Msg:  msg,
+				Data: gotResp,
+			}
+		}
+		w.Header().Set(StatusCodeHeader, strconv.Itoa(int(code)))
+		w.Header().Set(StatusMsgHeader, msg)
+	ret:
+		if err := codec.Encode(gotResp); err != nil {
+			log.ErrorContext(ctx, err)
 			return
 		}
-		end := time.Now()
-		stack.Set("respData", string(rw.buffer.Bytes())).
-			Set("handleEnd", end.Format("2006-01-02 15:04:05"))
-		log.WithField("respData", string(rw.buffer.Bytes())).
-			WithField("handleEnd", end.Format("2006-01-02 15:04:05")).
-			InfoContext(ctx, "finish req")
 	}
 }
 
@@ -140,7 +184,7 @@ func (s *server) handle(ctx context.Context, codec ServerCodec, h interceptor.Me
 	}
 	if needWrap {
 		gotResp = respObj{
-			Code: 0,
+			Code: errcode.ErrCode_Ok,
 			Msg:  "success",
 			Data: gotResp,
 		}
@@ -168,22 +212,22 @@ func gprcMethodDescToMethodHandler(method grpc.MethodDesc, ss interface{}) inter
 	return func(ctx context.Context, dec func(interface{}) error, intr interceptor.ServerInterceptor) (interface{}, error) {
 		grpcInterceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 			resp, err := intr(ctx, req, interceptor.ServerHandler(handler))
-			if err != nil {
-				return nil, errorsx.Trace(err)
-			}
-			return resp, nil
+			return resp, errorsx.Trace(err)
 		}
 		resp, err := method.Handler(ss, ctx, dec, grpcInterceptor)
-		if err != nil {
-			return nil, errorsx.Trace(err)
-		}
-		return resp, nil
+		return resp, errorsx.Trace(err)
 	}
 }
 
 type responseWriter struct {
 	http.ResponseWriter
-	buffer *bytes.Buffer
+	buffer     *bytes.Buffer
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(statusCode int) {
+	rw.ResponseWriter.WriteHeader(statusCode)
+	rw.statusCode = statusCode
 }
 
 func (rw *responseWriter) Write(data []byte) (int, error) {
@@ -193,4 +237,126 @@ func (rw *responseWriter) Write(data []byte) (int, error) {
 	}
 	rw.buffer.Write(data[:n])
 	return n, nil
+}
+
+// WrapHTTPHandler WrapHTTPHandler
+func WrapHTTPHandler(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		wrappedHandler := wrapHTTPHandler(handler)
+		if wrappedHandler != nil {
+			wrappedHandler.ServeHTTP(w, req)
+		}
+	}
+}
+func wrapHTTPHandler(handler http.Handler) http.Handler {
+	middleware := defaultChainedHTTPMiddleware()
+	wrappedHandler := middleware(handler)
+	return wrappedHandler
+}
+
+func defaultChainedHTTPMiddleware() httpMiddleware {
+	return chainedHTTPMiddleware(trace, metrics, recovery)
+}
+
+func chainedHTTPMiddleware(middlewares ...httpMiddleware) httpMiddleware {
+	return func(handler http.Handler) http.Handler {
+		chainedHandler := handler
+		for i := len(middlewares) - 1; i >= 0; i-- {
+			chainedHandler = middlewares[i](chainedHandler)
+		}
+		return chainedHandler
+	}
+}
+
+type httpMiddleware func(http.Handler) http.Handler
+
+func trace(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+		defer cancel()
+		span, ctx := tracing.HTTPServerStartSpan(ctx, "serve", req, w)
+		ctx = ContextWithIncomingMetadata(ctx, Metadata(req.Header))
+		ldap := LdapFromIncomingContext(ctx)
+		token := TokenFromIncomingContext(ctx)
+		rw := &responseWriter{ResponseWriter: w, buffer: bytes.NewBuffer(nil)}
+		stack := stack.New().
+			Set("httpmethod", req.Method).
+			Set("path", req.URL.Path).
+			Set("ldap", ldap).
+			Set("token", token)
+		var err error
+		defer span.FinishWithFields(&err, stack)
+		reqData, reqBody, err := httpx.DrainBody(req.Body)
+		if err != nil {
+			stack.Set("httpStatusCode", rw.statusCode)
+			log.WithFields(stack).
+				ErrorContext(ctx, err)
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		start := time.Now()
+		stack.Set("reqData", string(reqData)).
+			Set("handleStart", start.Format("2006-01-02 15:04:05"))
+		log.WithFields(stack).
+			InfoContext(ctx, "recv req")
+		req = req.WithContext(ctx)
+		req.Body = reqBody
+		if next != nil {
+			next.ServeHTTP(rw, req)
+			if rw.statusCode == 0 {
+				rw.statusCode = http.StatusOK
+			}
+		}
+		statusCode := rw.Header().Get(StatusCodeHeader)
+		statusMsg := rw.Header().Get(StatusMsgHeader)
+		end := time.Now()
+		stack.Set("respData", string(rw.buffer.Bytes())).
+			Set("httpStatusCode", rw.statusCode).
+			Set("statusCode", statusCode).
+			Set("statusMsg", statusMsg).
+			Set("handleEnd", end.Format("2006-01-02 15:04:05"))
+		log.WithField("respData", string(rw.buffer.Bytes())).
+			WithField("httpStatusCode", rw.statusCode).
+			WithField("statusCode", statusCode).
+			WithField("statusMsg", statusMsg).
+			WithField("handleEnd", end.Format("2006-01-02 15:04:05")).
+			InfoContext(ctx, "finish req")
+	})
+}
+
+func metrics(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// to do
+		if next != nil {
+			next.ServeHTTP(w, req)
+		}
+	})
+}
+
+func recovery(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer func() {
+			ctx := req.Context()
+			if e := recover(); e != nil {
+				if e == http.ErrAbortHandler {
+					panic(http.ErrAbortHandler)
+				}
+				var err error
+				switch v := e.(type) {
+				case error:
+					err = v
+				default:
+					err = fmt.Errorf("%+v", v)
+				}
+				stack := stack.Callers(stack.StdFilter)
+				log.WithField("stack", stack).
+					ErrorContext(ctx, err)
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}()
+		if next != nil {
+			next.ServeHTTP(w, req)
+		}
+	})
 }

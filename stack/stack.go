@@ -10,6 +10,7 @@ import (
 var (
 	wd        string
 	modPrefix string
+	gopath    = os.Getenv("GOPATH")
 )
 
 func init() {
@@ -40,12 +41,16 @@ next:
 	frame, hasNext := frames.Next()
 	if hasNext {
 		function := trimFunction(frame.Function)
+		if filter(frame.File) {
+			goto next
+		}
 		file := trimFile(frame.File)
 		if filter(file) {
 			goto next
 		}
 
 		line := frame.Line
+
 		stack = append(stack, fmt.Sprintf("%s@%s:%d", function, file, line))
 		goto next
 	}
@@ -68,10 +73,10 @@ func trimFunction(src string) string {
 }
 
 func trimFile(src string) string {
-
-	if !strings.HasPrefix(src, wd) {
-		return src
+	if gopath != "" {
+		src = strings.TrimPrefix(src, gopath+"/pkg/mod/")
 	}
+
 	return strings.TrimPrefix(src, wd)
 }
 
@@ -82,5 +87,6 @@ func stackfilter(src string) bool {
 
 // StdFilter StdFilters
 func StdFilter(src string) bool {
-	return strings.Contains(src, "/go/src/")
+	goRoot := os.Getenv("GOROOT")
+	return goRoot != "" && strings.Contains(src, goRoot+"/src")
 }

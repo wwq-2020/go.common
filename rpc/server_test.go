@@ -29,7 +29,7 @@ func (r *resp) UnWrap() bool {
 }
 
 func TestServer(t *testing.T) {
-	s := rpc.NewServer("aa", ":8083")
+	s := rpc.NewServer("aa", nil)
 
 	type req struct {
 		Data string
@@ -48,16 +48,10 @@ func TestServer(t *testing.T) {
 		}
 		handler := func(ctx context.Context, reqObj interface{}) (interface{}, error) {
 			resp, err := handler(ctx, reqObj.(*req))
-			if err != nil {
-				return nil, errorsx.Trace(err)
-			}
-			return resp, nil
+			return resp, errorsx.Trace(err)
 		}
 		resp, err := interceptor(ctx, in, handler)
-		if err != nil {
-			return nil, errorsx.Trace(err)
-		}
-		return resp, nil
+		return resp, errorsx.Trace(err)
 	}
 	interceptor := func(ctx context.Context, req interface{}, handler interceptor.ServerHandler) (resp interface{}, err error) {
 		ctx = context.WithValue(ctx, "aa", 1)
@@ -69,10 +63,10 @@ func TestServer(t *testing.T) {
 	go s.Start()
 
 	time.Sleep(time.Second)
-	c := rpc.NewClient("aa", "127.0.0.1:8083")
+	c := rpc.NewClient("aa", "127.0.0.1:8080")
 	respObj := &resp{}
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*3)
 	defer cancel()
-	fmt.Println(c.Invoke(ctx, "/", req{Data: "xx"}, respObj), respObj, rpc.InvokeWithTracingOptions(rpc.TracingOptions{Root: false}))
+	fmt.Println(c.Invoke(ctx, "/a", req{Data: "xx"}, respObj), respObj)
 	time.Sleep(time.Second * 2)
 }

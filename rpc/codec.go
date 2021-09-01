@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/wwq-2020/go.common/errcode"
 	"github.com/wwq-2020/go.common/errorsx"
 )
 
@@ -40,9 +41,9 @@ func (c *jsonCodec) Decode(data []byte, obj interface{}) error {
 }
 
 type respObj struct {
-	Code int         `json:"code"`
-	Msg  string      `json:"msg"`
-	Data interface{} `json:"data"`
+	Code errcode.ErrCode `json:"code"`
+	Msg  string          `json:"msg"`
+	Data interface{}     `json:"data"`
 }
 
 // ServerCodec ServerCodec
@@ -58,9 +59,8 @@ type serverCodec struct {
 	codec Codec
 }
 
-func serverCodecFactory(ctx context.Context, r io.Reader, w io.Writer, codec Codec) ServerCodec {
+func serverCodecFactory(r io.Reader, w io.Writer, codec Codec) ServerCodec {
 	return &serverCodec{
-		ctx:   ctx,
 		r:     r,
 		w:     w,
 		codec: codec,

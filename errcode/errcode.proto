@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package errcode;
+
+option go_package = "github.com/wwq-2020/go.common/errcode";
+
+// ErrCode ErrCode
+enum ErrCode {
+  // 1-999 基础错误
+  // 1-16详见grpc code
+  // Ok 成功
+  Ok = 0;
+  // Canceled 取消
+  Canceled = 1;
+  // Unknown 未知错误
+  Unknown = 2;
+  // InvalidArgument 参数错误
+  InvalidArgument = 3;
+  // DeadlineExceeded 超时
+  DeadlineExceeded = 4;
+  // NotFound 请求资源未找到
+  NotFound = 5;
+  // AlreadyExists 请求资源已存在
+  AlreadyExists = 6;
+  // PermissionDenied 请求权限不足
+  PermissionDenied = 7;
+  // ResourceExhausted 资源耗尽
+  ResourceExhausted = 8;
+  // FailedPrecondition 前置条件不满足,如删除非空目录
+  FailedPrecondition = 9;
+  // Aborted 请求被终止
+  Aborted = 10;
+  // OutOfRange 操作超时有效范围
+  OutOfRange = 11;
+  // Unimplemented 未实现
+  Unimplemented = 12;
+  // Internal 底层系统未逾期的错误
+  Internal = 13;
+  // Unavailable 系统不可用
+  Unavailable = 14;
+  // DataLoss 数据丢失
+  DataLoss = 15;
+  // Unauthenticated 未认证
+  Unauthenticated = 16;
+
+  // 内部code
+  // Ambiguity 歧义
+  Ambiguity = 17;
+  // Stale 脏数据
+  Stale = 18;
+}

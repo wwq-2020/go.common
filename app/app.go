@@ -40,61 +40,71 @@ func New() *App {
 	return app
 }
 
+// Done Done
+func (app *App) Done() <-chan struct{} {
+	return app.Context().Done()
+}
+
+// Context Context
+func (app *App) Context() context.Context {
+	return app.ctx
+}
+
 // Go 开启应用goroutine
 func (app *App) Go(f func(context.Context)) {
-	app.wg.Add(1)
-	go func() {
-		defer app.wg.Done()
-		f(app.ctx)
-	}()
+	wrappedF := func() {
+		f(app.Context())
+	}
+	app.GoAsync(wrappedF)
 }
 
 // GoForever GoForever
 func (app *App) GoForever(f func(context.Context)) {
 	app.wg.Add(1)
-	wrappedF := func(ctx context.Context) {
-		defer func() {
-			if e := recover(); e != nil {
-				stack := stack.Callers(stack.StdFilter)
-				var err error
-				switch t := e.(type) {
-				case error:
-					err = t
-				default:
-					err = fmt.Errorf("%#v", t)
-				}
-				log.WithField("stack", stack).
-					ErrorContext(ctx, err)
-			}
-		}()
-		f(ctx)
+	wrappedF := func() {
+		f(app.Context())
 	}
-	go func() {
+	app.GoAsync(func() {
+		defer app.wg.Done()
 		for {
-			wrappedF(app.ctx)
+			wrappedF()
 			select {
 			case <-app.ctx.Done():
-				app.wg.Done()
 				return
 			default:
 			}
 		}
-	}()
+	})
+}
+
+// withCancel withCancel
+func (app *App) withCancel(ctx context.Context) (context.Context, context.CancelFunc) {
+	app.wg.Add(1)
+	newCtx, cancel := context.WithCancel(ctx)
+	app.GoAsync(func() {
+		defer app.wg.Done()
+		defer cancel()
+		select {
+		case <-newCtx.Done():
+		case <-app.ctx.Done():
+		}
+	})
+	return newCtx, cancel
+}
+
+// GoForeverContext GoForeverContext
+func (app *App) GoForeverContext(ctx context.Context, f func(context.Context)) {
+	newCtx, _ := app.withCancel(ctx)
+	wrappedF := func() {
+		f(newCtx)
+	}
+	app.GoAsyncForeverContext(ctx, wrappedF)
 }
 
 // GoAsync 开启应用goroutine
 func (app *App) GoAsync(f func()) {
 	app.wg.Add(1)
 	go func() {
-		defer app.wg.Done()
-		f()
-	}()
-}
-
-// GoAsyncForever GoAsyncForever
-func (app *App) GoAsyncForever(f func()) {
-	app.wg.Add(1)
-	wrappedF := func() {
 		defer func() {
 			if e := recover(); e != nil {
 				stack := stack.Callers(stack.StdFilter)
@@ -108,46 +118,46 @@ func (app *App) GoAsyncForever(f func()) {
 				log.WithField("stack", stack).
 					Error(err)
 			}
+			app.wg.Done()
 		}()
 		f()
+	}()
+}
+
+// GoAsyncForever GoAsyncForever
+func (app *App) GoAsyncForever(f func()) {
+	app.GoAsyncForeverContext(context.Background(), f)
+}
+
+// GoAsyncForeverContext GoAsyncForeverContext
+func (app *App) GoAsyncForeverContext(ctx context.Context, f func()) {
+	app.wg.Add(1)
+	wrappedF := func() {
+		f()
 	}
-	go func() {
+	app.GoAsync(func() {
+		defer app.wg.Done()
 		for {
 			wrappedF()
 			select {
 			case <-app.ctx.Done():
-				app.wg.Done()
+				return
+			case <-ctx.Done():
 				return
 			default:
 			}
 		}
-	}()
+	})
 }
 
-// GoWithContext 开启应用goroutine,携带context
-func (app *App) GoWithContext(ctx context.Context, f func(context.Context)) {
-	app.wg.Add(2)
-	wrappedCtx, cancel := context.WithCancel(ctx)
-	doneCh := make(chan struct{})
-	go func() {
-		defer func() {
-			app.wg.Done()
-		}()
-		select {
-		case <-ctx.Done():
-			cancel()
-		case <-app.ctx.Done():
-			cancel()
-		case <-doneCh:
-		}
-	}()
-	go func() {
-		defer func() {
-			close(doneCh)
-			app.wg.Done()
-		}()
-		f(wrappedCtx)
-	}()
+// GoContext 开启应用goroutine,携带context
+func (app *App) GoContext(ctx context.Context, f func(context.Context)) {
+	newCtx, cancel := app.withCancel(ctx)
+	wrappedF := func() {
+		defer cancel()
+		f(newCtx)
+	}
+	app.GoAsync(wrappedF)
 }
 
 // Close 结束这个应用
@@ -158,10 +168,11 @@ func (app *App) Close() {
 		child.Close()
 		child.Wait()
 	}
-	app.cancel()
 	for _, shutdownHook := range app.shutdownHooks {
 		shutdownHook()
 	}
+	app.cancel()
+	log.Info("grace exit")
 }
 
 // Wait 等待应用goroutine全部退出
@@ -187,17 +198,13 @@ func (app *App) AddShutdownHook(hook func()) {
 func CatchExitSignal(callback func()) {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
-	signal := <-signalCh
+	<-signalCh
 	go func() {
 		signal := <-signalCh
 		log.WithField("signal", signal).
 			Info("force exit")
 		os.Exit(1)
 	}()
-	GraceExitHook = func() {
-		log.WithField("signal", signal).
-			Info("grace exit")
-	}
 	callback()
 }
 
@@ -225,10 +232,22 @@ func GoForever(f func(context.Context)) {
 	globalApp.GoForever(f)
 }
 
+// GoForeverContext GoForeverContext
+func GoForeverContext(ctx context.Context, f func(context.Context)) {
+	setupOnce.Do(setup)
+	globalApp.GoForeverContext(ctx, f)
+}
+
 // GoAsyncForever GoAsyncForever
 func GoAsyncForever(f func()) {
 	setupOnce.Do(setup)
 	globalApp.GoAsyncForever(f)
+}
+
+// GoAsyncForeverContext GoAsyncForeverContext
+func GoAsyncForeverContext(ctx context.Context, f func()) {
+	setupOnce.Do(setup)
+	globalApp.GoAsyncForeverContext(ctx, f)
 }
 
 // GoAsync GoAsync
@@ -247,7 +266,6 @@ func Wait() {
 	default:
 	}
 	globalApp.Wait()
-	GraceExitHook()
 }
 
 // Close 结束应用
@@ -259,13 +277,13 @@ func Close() {
 // Done Done
 func Done() <-chan struct{} {
 	setupOnce.Do(setup)
-	return globalApp.ctx.Done()
+	return globalApp.Done()
 }
 
 // Context Context
 func Context() context.Context {
 	setupOnce.Do(setup)
-	return globalApp.ctx
+	return globalApp.Context()
 }
 
 // AddChild 添加子应用

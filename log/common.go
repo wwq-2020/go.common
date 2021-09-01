@@ -24,9 +24,20 @@ func ContextWithTraceIDWithFun(ctx context.Context, fun func() string) context.C
 	return ContextWithTraceID(ctx, fun())
 }
 
+// ContextWithTraceIDWithFunx ContextWithTraceIDWithFunx
+func ContextWithTraceIDWithFunx(ctx context.Context, fun func() string) (context.Context, string) {
+	traceID := fun()
+	return ContextWithTraceID(ctx, traceID), traceID
+}
+
 // ContextEnsureTraceID ContextEnsureTraceID
 func ContextEnsureTraceID(ctx context.Context) context.Context {
 	return ContextEnsureTraceIDWithGen(ctx, GenTraceID)
+}
+
+// ContextEnsureTraceIDx ContextEnsureTraceIDx
+func ContextEnsureTraceIDx(ctx context.Context) (context.Context, string) {
+	return ContextEnsureTraceIDWithGenx(ctx, GenTraceID)
 }
 
 // ContextEnsureTraceIDWithGen ContextEnsureTraceIDWithGen
@@ -36,6 +47,15 @@ func ContextEnsureTraceIDWithGen(ctx context.Context, fun func() string) context
 		return ContextWithTraceIDWithFun(ctx, fun)
 	}
 	return ctx
+}
+
+// ContextEnsureTraceIDWithGenx ContextEnsureTraceIDWithGenx
+func ContextEnsureTraceIDWithGenx(ctx context.Context, fun func() string) (context.Context, string) {
+	traceID := TraceIDFromContext(ctx)
+	if traceID == "" {
+		return ContextWithTraceIDWithFunx(ctx, fun)
+	}
+	return ctx, traceID
 }
 
 // TraceIDFromContext TraceIDFromContext

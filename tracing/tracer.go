@@ -25,9 +25,21 @@ const (
 	TraceIDName       = "traceid"
 )
 
+// Conf Conf
+type Conf struct {
+	Endpoint   string  `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
+	SampleRate float64 `json:"sample_rate" toml:"sample_rate" yaml:"sample_rate"`
+}
+
+func (c *Conf) fill() {
+	if c.SampleRate < 0 || c.SampleRate > 1 {
+		c.SampleRate = DefaultSampleRate
+	}
+}
+
 // MustInitGlobalTracer MustInitGlobalTracer
-func MustInitGlobalTracer(serviceName, endpoint string, sampleRate float64) func() {
-	cleanup, err := InitGlobalTracer(serviceName, endpoint, sampleRate)
+func MustInitGlobalTracer(serviceName string, conf *Conf) func() {
+	cleanup, err := InitGlobalTracer(serviceName, conf)
 	if err != nil {
 		log.WithError(err).Fatal("failed to InitGlobalTracer")
 	}
@@ -35,19 +47,16 @@ func MustInitGlobalTracer(serviceName, endpoint string, sampleRate float64) func
 }
 
 // InitGlobalTracer InitGlobalTracer
-func InitGlobalTracer(serviceName, endpoint string, sampleRate float64) (func(), error) {
-	if sampleRate < 0 || sampleRate > 1 {
-		return nil, errorsx.NewWithField("invalid sampleRate", "sampleRate", sampleRate)
+func InitGlobalTracer(serviceName string, conf *Conf) (func(), error) {
+	if serviceName == "" {
+		return func() {}, errorsx.New("empty serviceName")
 	}
-	if sampleRate == 0 {
-		sampleRate = DefaultSampleRate
-	}
-
+	conf.fill()
 	cfg := jaegercfg.Configuration{
 		ServiceName: serviceName,
 		Sampler: &jaegercfg.SamplerConfig{
 			Type:  jaeger.SamplerTypeProbabilistic,
-			Param: sampleRate,
+			Param: conf.SampleRate,
 		},
 		Gen128Bit: true,
 		Headers: &jaeger.HeadersConfig{
@@ -58,7 +67,7 @@ func InitGlobalTracer(serviceName, endpoint string, sampleRate float64) (func(),
 		serviceName,
 		jaegercfg.Logger(&jaegerLogger{}),
 		// jaegercfg.Metrics(&jaegerMetrics{}),
-		jaegercfg.Reporter(jaeger.NewRemoteReporter(transport.NewHTTPTransport(endpoint))),
+		jaegercfg.Reporter(jaeger.NewRemoteReporter(transport.NewHTTPTransport(conf.Endpoint))),
 	)
 	if err != nil {
 		return nil, errorsx.Trace(err)
@@ -157,48 +166,10 @@ func (s *span) WithFields(stack stack.Fields) Span {
 	return s
 }
 
-var defaultStartSpanOptions = StartSpanOptions{
-	spanReferenceType: opentracing.ChildOfRef,
-}
-
-// StartSpanOptions StartSpanOptions
-type StartSpanOptions struct {
-	spanReferenceType opentracing.SpanReferenceType
-	root              bool
-}
-
-// StartSpanOption StartSpanOption
-type StartSpanOption func(*StartSpanOptions)
-
-// ChildOf ChildOf
-func ChildOf() StartSpanOption {
-	return func(o *StartSpanOptions) {
-		o.spanReferenceType = opentracing.ChildOfRef
-	}
-}
-
-// FollowsFrom FollowsFrom
-func FollowsFrom() StartSpanOption {
-	return func(o *StartSpanOptions) {
-		o.spanReferenceType = opentracing.FollowsFromRef
-	}
-}
-
-// Root Root
-func Root(root bool) StartSpanOption {
-	return func(o *StartSpanOptions) {
-		o.root = root
-	}
-}
-
-func startSpan(ctx context.Context, operationName string, opts ...StartSpanOption) (opentracing.Span, context.Context) {
-	options := defaultStartSpanOptions
-	for _, opt := range opts {
-		opt(&options)
-	}
+func startSpan(ctx context.Context, operationName string) (opentracing.Span, context.Context) {
+	options := OptionsFromContext(ctx)
 	tracer := opentracing.GlobalTracer()
-
-	if options.root {
+	if options != nil && options.Root {
 		span := tracer.StartSpan(operationName)
 		return span, opentracing.ContextWithSpan(ctx, span)
 	}
@@ -209,39 +180,40 @@ func startSpan(ctx context.Context, operationName string, opts ...StartSpanOptio
 	}
 
 	tracingOptions := make([]opentracing.StartSpanOption, 0, 1)
-
-	switch options.spanReferenceType {
+	if options == nil {
+		tracingOptions = append(tracingOptions, opentracing.ChildOf(parentSpan.Context()))
+		goto start
+	}
+	switch options.SpanType {
 	default:
 		fallthrough
-	case opentracing.ChildOfRef:
+	case ChildOfSpanType:
 		tracingOptions = append(tracingOptions, opentracing.ChildOf(parentSpan.Context()))
-	case opentracing.FollowsFromRef:
+	case FollowsFromSpanType:
 		tracingOptions = append(tracingOptions, opentracing.FollowsFrom(parentSpan.Context()))
 	}
-
+start:
 	span := tracer.StartSpan(operationName, tracingOptions...)
 	return span, opentracing.ContextWithSpan(ctx, span)
 }
 
 // StartSpan StartSpan
-func StartSpan(ctx context.Context, operationName string, opts ...StartSpanOption) (Span, context.Context) {
-	opentracingSpan, ctx := startSpan(ctx, operationName, opts...)
+func StartSpan(ctx context.Context, operationName string) (Span, context.Context) {
+	opentracingSpan, ctx := startSpan(ctx, operationName)
 	tracer := opentracing.GlobalTracer()
 	if tracer == noopTracer {
-		traceID := log.TraceIDFromContext(ctx)
-		if traceID == "" {
-			ctx = log.ContextWithTraceID(ctx, log.GenTraceID())
-		}
+		ctx := log.ContextEnsureTraceIDWithGen(ctx, log.GenTraceID)
+		return newSpan(opentracingSpan), ctx
 	}
-	if tracer != noopTracer {
-		traceID := traceIDFromOpentracingSpan(opentracingSpan)
-		ctx = log.ContextWithTraceID(ctx, traceID)
-	}
+	traceID := traceIDFromOpentracingSpan(opentracingSpan)
+	ctx = log.ContextWithTraceID(ctx, traceID)
 	return newSpan(opentracingSpan), ctx
 }
 
 // HTTPServerStartSpan HTTPServerStartSpan
 func HTTPServerStartSpan(ctx context.Context, operationName string, httpReq *http.Request, w http.ResponseWriter) (Span, context.Context) {
+	options := OptionsFromContext(ctx)
+
 	tracer := opentracing.GlobalTracer()
 	if tracer == noopTracer {
 		traceID := parseTraceID(httpReq)
@@ -258,27 +230,12 @@ func HTTPServerStartSpan(ctx context.Context, operationName string, httpReq *htt
 		span.InjectToHTTPResponse(ctx, w)
 		return span, opentracing.ContextWithSpan(ctx, opentracingSpan)
 	}
-	span, ctx := StartSpan(ctx, operationName, Root(true))
+	if options == nil {
+		ctx = ContextWithRootOptions(ctx, true)
+	}
+	span, ctx := StartSpan(ctx, operationName)
 	span.InjectToHTTPResponse(ctx, w)
 	return span, ctx
-}
-
-// HTTPClientStartSpan HTTPClientStartSpan
-func HTTPClientStartSpan(ctx context.Context, operationName string, httpReq *http.Request, opts ...StartSpanOption) (Span, context.Context) {
-	opentracingSpan, ctx := startSpan(ctx, operationName, opts...)
-	tracer := opentracing.GlobalTracer()
-	if tracer == noopTracer {
-		traceID := log.TraceIDFromContext(ctx)
-		if traceID == "" {
-			traceID = log.GenTraceID()
-			ctx = log.ContextWithTraceID(ctx, traceID)
-		}
-		httpReq.Header.Set(TraceIDName, traceID)
-	}
-	if err := tracer.Inject(opentracingSpan.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(httpReq.Header)); err != nil {
-		log.ErrorContext(ctx, err)
-	}
-	return newSpan(opentracingSpan), ctx
 }
 
 func parseTraceID(httpReq *http.Request) string {
@@ -299,4 +256,100 @@ func parseTraceID(httpReq *http.Request) string {
 func traceIDFromOpentracingSpan(opentracingSpan opentracing.Span) string {
 	jaegerSpan := opentracingSpan.(*jaeger.Span)
 	return jaegerSpan.SpanContext().TraceID().String()
+}
+
+// Options Options
+type Options struct {
+	Root     bool
+	SpanType SpanType
+}
+
+var (
+	defaultOptions = Options{
+		Root:     true,
+		SpanType: ChildOfSpanType,
+	}
+)
+
+// SpanType SpanType
+type SpanType int
+
+// SpanTypes
+const (
+	ChildOfSpanType SpanType = iota
+	FollowsFromSpanType
+)
+
+type optionsKey struct {
+}
+
+// ContextWithOptions ContextWithOptions
+func ContextWithOptions(ctx context.Context, opts *Options) context.Context {
+	return context.WithValue(ctx, optionsKey{}, opts)
+}
+
+// OptionsFromContext OptionsFromContext
+func OptionsFromContext(ctx context.Context) *Options {
+	v := ctx.Value(optionsKey{})
+	if v == nil {
+		return nil
+	}
+	options, ok := v.(*Options)
+	if !ok {
+		return nil
+	}
+	return options
+}
+
+// ContextEnsureOptions ContextEnsureOptions
+func ContextEnsureOptions(ctx context.Context) context.Context {
+	ctx, _ = ContextEnsureOptionsx(ctx)
+	return ctx
+}
+
+// ContextEnsureOptionsx ContextEnsureOptionsx
+func ContextEnsureOptionsx(ctx context.Context) (context.Context, *Options) {
+	options := defaultOptions
+	return ContextEnsureOptionsWithOptionsx(ctx, &options)
+}
+
+// ContextEnsureOptionsWithOptions ContextEnsureOptionsWithOptionsContext
+func ContextEnsureOptionsWithOptions(ctx context.Context, options *Options) context.Context {
+	ctx, _ = ContextEnsureOptionsWithOptionsx(ctx, options)
+	return ctx
+}
+
+// ContextEnsureOptionsWithOptionsx ContextEnsureOptionsWithOptionsx
+func ContextEnsureOptionsWithOptionsx(ctx context.Context, options *Options) (context.Context, *Options) {
+	curOptions := OptionsFromContext(ctx)
+	if curOptions == nil {
+		return ContextWithOptions(ctx, options), options
+	}
+	return ctx, curOptions
+}
+
+// ContextWithRootOptions ContextWithRootOptions
+func ContextWithRootOptions(ctx context.Context, root bool) context.Context {
+	ctx, _ = ContextWithRootOptionsx(ctx, root)
+	return ctx
+}
+
+// ContextWithRootOptionsx ContextWithRootOptionsx
+func ContextWithRootOptionsx(ctx context.Context, root bool) (context.Context, *Options) {
+	ctx, options := ContextEnsureOptionsx(ctx)
+	options.Root = root
+	return ctx, options
+}
+
+// ContextWithSpanTypeOptions ContextWithSpanTypeOptions
+func ContextWithSpanTypeOptions(ctx context.Context, spanType SpanType) context.Context {
+	ctx, _ = ContextWithSpanTypeOptionsx(ctx, spanType)
+	return ctx
+}
+
+// ContextWithSpanTypeOptionsx ContextWithSpanTypeOptionsx
+func ContextWithSpanTypeOptionsx(ctx context.Context, spanType SpanType) (context.Context, *Options) {
+	ctx, options := ContextEnsureOptionsx(ctx)
+	options.SpanType = spanType
+	return ctx, options
 }

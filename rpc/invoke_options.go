@@ -1,30 +1,23 @@
 package rpc
 
-import "github.com/wwq-2020/go.common/tracing"
+import (
+	"github.com/wwq-2020/go.common/errcode"
+)
 
 // InvokeOptions InvokeOptions
 type InvokeOptions struct {
-	metadata       Metadata
-	expectedCode   int
-	codec          Codec
-	tracingOptions TracingOptions
+	metadata     Metadata
+	expectedCode errcode.ErrCode
+	codec        Codec
 }
 
 // Clone Clone
 func (o *InvokeOptions) Clone() InvokeOptions {
 	return InvokeOptions{
-		metadata:       o.metadata.Clone(),
-		expectedCode:   o.expectedCode,
-		codec:          o.codec,
-		tracingOptions: o.tracingOptions,
+		metadata:     o.metadata.Clone(),
+		expectedCode: o.expectedCode,
+		codec:        o.codec,
 	}
-}
-
-// TracingOptions TracingOptions
-type TracingOptions struct {
-	StartSpanOptions []tracing.StartSpanOption
-	Root             bool
-	OperationName    string
 }
 
 // InvokeOption InvokeOption
@@ -38,7 +31,7 @@ func InvokeWithMetadata(metadata Metadata) InvokeOption {
 }
 
 // InvokeWithExpectedCode InvokeWithExpectedCode
-func InvokeWithExpectedCode(expectedCode int) InvokeOption {
+func InvokeWithExpectedCode(expectedCode errcode.ErrCode) InvokeOption {
 	return func(o *InvokeOptions) {
 		o.expectedCode = expectedCode
 	}
@@ -51,21 +44,10 @@ func InvokeWithCodec(codec Codec) InvokeOption {
 	}
 }
 
-// InvokeWithTracingOptions InvokeWithTracingOptions
-func InvokeWithTracingOptions(tracingOptions TracingOptions) InvokeOption {
-	return func(o *InvokeOptions) {
-		o.tracingOptions = tracingOptions
-	}
-}
-
 var (
 	defaultInvokeOptions = InvokeOptions{
 		metadata:     NewMetadata(),
-		expectedCode: 0,
+		expectedCode: errcode.ErrCode_Ok,
 		codec:        JSONCodec(),
-		tracingOptions: TracingOptions{
-			Root:             true,
-			StartSpanOptions: []tracing.StartSpanOption{tracing.ChildOf()},
-		},
 	}
 )

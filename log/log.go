@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/wwq-2020/go.common/stack"
 	"github.com/wwq-2020/go.common/errorsx"
+	"github.com/wwq-2020/go.common/stack"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -84,6 +84,8 @@ type Logger interface {
 	AddDep(int) Logger
 	// Close Close
 	Close() error
+	// WithStack WithStack
+	WithStack() Logger
 }
 
 // Fields Fields
@@ -111,10 +113,11 @@ const (
 
 // Entry Entry
 type logger struct {
-	l       *zap.Logger
-	depth   int
-	options *Options
-	writer  zapcore.WriteSyncer
+	l         *zap.Logger
+	depth     int
+	options   *Options
+	writer    zapcore.WriteSyncer
+	withStack bool
 }
 
 // New 初始化Logger
@@ -405,6 +408,11 @@ func WithError(err error) Logger {
 	return stdWith.WithError(err)
 }
 
+// WithStack WithStack
+func WithStack() Logger {
+	return std.WithStack()
+}
+
 // ContextLoggerSetLevel ContextLoggerSetLevel
 func ContextLoggerSetLevel(ctx context.Context, level Level) {
 	logger := LoggerFromContext(ctx)
@@ -449,19 +457,31 @@ func ContextLoggerWithError(ctx context.Context, err error) Logger {
 
 // Infof Infof
 func (l *logger) Infof(msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
+	logger.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Info(fmt.Sprintf(msg, args...))
 }
 
 // Info Info
 func (l *logger) Info(msg string) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
+	logger.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Info(msg)
 }
 
 // Errorf Errorf
 func (l *logger) Errorf(msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
+	logger.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Error(fmt.Sprintf(msg, args...))
 }
 
@@ -475,72 +495,116 @@ func (l *logger) Error(err error) {
 
 // Warnf Warnf
 func (l *logger) Warnf(msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
+	logger.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Warn(fmt.Sprintf(msg, args...))
 }
 
 // Warn Warn
 func (l *logger) Warn(msg string) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
+	logger.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Warn(msg)
 }
 
 // Debugf Debugf
 func (l *logger) Debugf(msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
+	logger.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Debug(fmt.Sprintf(msg, args...))
 }
 
 // Debug Debug
 func (l *logger) Debug(msg string) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
+	logger.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Debug(msg)
 }
 
 // Fatalf Fatalf
 func (l *logger) Fatalf(msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
+	logger.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Fatal(fmt.Sprintf(msg, args...))
 }
 
 // Fatal Fatal
 func (l *logger) Fatal(msg string) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
+	logger.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Fatal(msg)
 }
 
 // Panicf Panicf
 func (l *logger) Panicf(msg string, args ...interface{}) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
+	logger.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Panic(fmt.Sprintf(msg, args...))
 }
 
 // Panic Panic
 func (l *logger) Panic(msg string) {
-	l.l.With(zap.String("caller", stack.Caller(l.depth+1))).
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
+	logger.With(zap.String("caller", stack.Caller(l.depth+1))).
 		Panic(msg)
 }
 
 // InfofContext InfofContext
 func (l *logger) InfofContext(ctx context.Context, msg string, args ...interface{}) {
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
 	ctxFields := zapFieldsFromContext(ctx)
-	l.l.With(ctxFields...).
+	logger.With(ctxFields...).
 		With(zap.String("caller", stack.Caller(l.depth+1))).
 		Info(fmt.Sprintf(msg, args...))
 }
 
 // InfoContext InfoContext
 func (l *logger) InfoContext(ctx context.Context, msg string) {
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
 	ctxFields := zapFieldsFromContext(ctx)
-	l.l.With(ctxFields...).
+	logger.With(ctxFields...).
 		With(zap.String("caller", stack.Caller(l.depth+1))).
 		Info(msg)
 }
 
 // ErrorfContext ErrorfContext
 func (l *logger) ErrorfContext(ctx context.Context, msg string, args ...interface{}) {
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
 	ctxFields := zapFieldsFromContext(ctx)
-	l.l.With(ctxFields...).
+	logger.With(ctxFields...).
 		With(zap.String("caller", stack.Caller(l.depth+1))).
 		Error(fmt.Sprintf(msg, args...))
 }
@@ -557,64 +621,96 @@ func (l *logger) ErrorContext(ctx context.Context, err error) {
 
 // WarnfContext WarnfContext
 func (l *logger) WarnfContext(ctx context.Context, msg string, args ...interface{}) {
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
 	ctxFields := zapFieldsFromContext(ctx)
-	l.l.With(ctxFields...).
+	logger.With(ctxFields...).
 		With(zap.String("caller", stack.Caller(l.depth+1))).
 		Warn(fmt.Sprintf(msg, args...))
 }
 
 // WarnContext WarnContext
 func (l *logger) WarnContext(ctx context.Context, msg string) {
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
 	ctxFields := zapFieldsFromContext(ctx)
-	l.l.With(ctxFields...).
+	logger.With(ctxFields...).
 		With(zap.String("caller", stack.Caller(l.depth+1))).
 		Warn(msg)
 }
 
 // DebugfContext DebugfContext
 func (l *logger) DebugfContext(ctx context.Context, msg string, args ...interface{}) {
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
 	ctxFields := zapFieldsFromContext(ctx)
-	l.l.With(ctxFields...).
+	logger.With(ctxFields...).
 		With(zap.String("caller", stack.Caller(l.depth+1))).
 		Debug(fmt.Sprintf(msg, args...))
 }
 
 // DebugContext DebugContext
 func (l *logger) DebugContext(ctx context.Context, msg string) {
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
 	ctxFields := zapFieldsFromContext(ctx)
-	l.l.With(ctxFields...).
+	logger.With(ctxFields...).
 		With(zap.String("caller", stack.Caller(l.depth+1))).
 		Debug(msg)
 }
 
 // FatalfContext FatalfContext
 func (l *logger) FatalfContext(ctx context.Context, msg string, args ...interface{}) {
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
 	ctxFields := zapFieldsFromContext(ctx)
-	l.l.With(ctxFields...).
+	logger.With(ctxFields...).
 		With(zap.String("caller", stack.Caller(l.depth+1))).
 		Fatal(fmt.Sprintf(msg, args...))
 }
 
 // FatalContext FatalContext
 func (l *logger) FatalContext(ctx context.Context, msg string) {
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
 	ctxFields := zapFieldsFromContext(ctx)
-	l.l.With(ctxFields...).
+	logger.With(ctxFields...).
 		With(zap.String("caller", stack.Caller(l.depth+1))).
 		Fatal(msg)
 }
 
 // PanicfContext PanicfContext
 func (l *logger) PanicfContext(ctx context.Context, msg string, args ...interface{}) {
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
 	ctxFields := zapFieldsFromContext(ctx)
-	l.l.With(ctxFields...).
+	logger.With(ctxFields...).
 		With(zap.String("caller", stack.Caller(l.depth+1))).
 		Panic(fmt.Sprintf(msg, args...))
 }
 
 // PanicContext PanicContext
 func (l *logger) PanicContext(ctx context.Context, msg string) {
+	logger := l.l
+	if l.withStack {
+		logger = logger.With(zap.String("stack", stack.Callers(stack.StdFilter)))
+	}
 	ctxFields := zapFieldsFromContext(ctx)
-	l.l.With(ctxFields...).
+	logger.With(ctxFields...).
 		With(zap.String("caller", stack.Caller(l.depth+1))).
 		Panic(msg)
 }
@@ -639,19 +735,33 @@ func (l *logger) SetStringLevel(level string) {
 func (l *logger) WithFields(fields stack.Fields) Logger {
 	options := *l.options
 	return &logger{
-		l:       l.l.With(fields2ZapFields(fields)...),
-		depth:   l.depth,
-		options: &options,
+		l:         l.l.With(fields2ZapFields(fields)...),
+		depth:     l.depth,
+		options:   &options,
+		withStack: l.withStack,
 	}
+}
+
+// Infof Infof
+func (l *logger) WithStack() Logger {
+	options := *l.options
+	return &logger{
+		withStack: true,
+		l:         l.l,
+		depth:     l.depth,
+		options:   &options,
+	}
+
 }
 
 // WithFields WithFields
 func (l *logger) WithZapFields(fields ...zap.Field) Logger {
 	options := *l.options
 	return &logger{
-		l:       l.l.With(fields...),
-		depth:   l.depth,
-		options: &options,
+		l:         l.l.With(fields...),
+		depth:     l.depth,
+		options:   &options,
+		withStack: l.withStack,
 	}
 }
 
@@ -660,9 +770,10 @@ func (l *logger) WithError(err error) Logger {
 	stack := errorsx.AllFields(err)
 	options := *l.options
 	return &logger{
-		l:       l.l.With(fields2ZapFields(stack)...),
-		depth:   l.depth,
-		options: &options,
+		l:         l.l.With(fields2ZapFields(stack)...),
+		depth:     l.depth,
+		withStack: l.withStack,
+		options:   &options,
 	}
 }
 
@@ -670,9 +781,10 @@ func (l *logger) WithError(err error) Logger {
 func (l *logger) WithField(key string, val interface{}) Logger {
 	options := *l.options
 	return &logger{
-		l:       l.l.With(zap.Any(key, val)),
-		depth:   l.depth,
-		options: &options,
+		l:         l.l.With(zap.Any(key, val)),
+		withStack: l.withStack,
+		depth:     l.depth,
+		options:   &options,
 	}
 }
 
@@ -694,9 +806,10 @@ func (l *logger) Dup() Logger {
 	options := *l.options
 	zapLogger := *l.l
 	return &logger{
-		l:       &zapLogger,
-		depth:   l.depth,
-		options: &options,
+		withStack: l.withStack,
+		l:         &zapLogger,
+		depth:     l.depth,
+		options:   &options,
 	}
 }
 
@@ -704,8 +817,9 @@ func (l *logger) AddDep(depth int) Logger {
 	options := *l.options
 	zapLogger := *l.l
 	return &logger{
-		l:       &zapLogger,
-		depth:   l.depth + depth,
-		options: &options,
+		l:         &zapLogger,
+		withStack: l.withStack,
+		depth:     l.depth + depth,
+		options:   &options,
 	}
 }

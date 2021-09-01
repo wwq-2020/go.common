@@ -19,14 +19,23 @@ func (m Metadata) Add(k, v string) Metadata {
 	return m
 }
 
+// Get Get
+func (m Metadata) Get(k string) string {
+	return http.Header(m).Get(k)
+}
+
 // Merge Merge
 func (m Metadata) Merge(givenMetadata Metadata) Metadata {
-	newMetadata := make(Metadata)
-	for k, v := range m {
-		newMetadata[k] = v
+	newMetadata := NewMetadata()
+	for k, vs := range m {
+		for _, v := range vs {
+			newMetadata.Add(k, v)
+		}
 	}
-	for k, v := range givenMetadata {
-		newMetadata[k] = v
+	for k, vs := range givenMetadata {
+		for _, v := range vs {
+			newMetadata.Add(k, v)
+		}
 	}
 	return newMetadata
 }
@@ -70,4 +79,58 @@ func ContextWithOutgoingMetadata(ctx context.Context, givenMetadata Metadata) co
 	curMetadata := OutgoingMetadataFromContext(ctx)
 	newMetadata := curMetadata.Merge(givenMetadata)
 	return context.WithValue(ctx, outgoingMetadataKey{}, newMetadata)
+}
+
+// consts
+const (
+	LdapKey  = "ldap"
+	TokenKey = "token"
+)
+
+// LdapFromIncomingContext LdapFromIncomingContext
+func LdapFromIncomingContext(ctx context.Context) string {
+	metadata := IncomingMetadataFromContext(ctx)
+	return metadata.Get(LdapKey)
+}
+
+// TokenFromIncomingContext TokenFromIncomingContext
+func TokenFromIncomingContext(ctx context.Context) string {
+	metadata := IncomingMetadataFromContext(ctx)
+	return metadata.Get(TokenKey)
+}
+
+// IncomingContextWithToken IncomingContextWithToken
+func IncomingContextWithToken(ctx context.Context, token string) context.Context {
+	metadata := NewMetadata().Add(TokenKey, token)
+	return ContextWithIncomingMetadata(ctx, metadata)
+}
+
+// IncomingContextWithLdap IncomingContextWithLdap
+func IncomingContextWithLdap(ctx context.Context, ldap string) context.Context {
+	metadata := NewMetadata().Add(LdapKey, ldap)
+	return ContextWithIncomingMetadata(ctx, metadata)
+}
+
+// LdapFromOutgoingContext LdapFromOutgoingContext
+func LdapFromOutgoingContext(ctx context.Context) string {
+	metadata := OutgoingMetadataFromContext(ctx)
+	return metadata.Get(LdapKey)
+}
+
+// TokenFromOutgoingContext TokenFromOutgoingContext
+func TokenFromOutgoingContext(ctx context.Context) string {
+	metadata := OutgoingMetadataFromContext(ctx)
+	return metadata.Get(TokenKey)
+}
+
+// OutgoingContextWithToken OutgoingContextWithToken
+func OutgoingContextWithToken(ctx context.Context, token string) context.Context {
+	metadata := NewMetadata().Add(TokenKey, token)
+	return ContextWithOutgoingMetadata(ctx, metadata)
+}
+
+// OutgoingContextWithLdap OutgoingContextWithLdap
+func OutgoingContextWithLdap(ctx context.Context, ldap string) context.Context {
+	metadata := NewMetadata().Add(LdapKey, ldap)
+	return ContextWithOutgoingMetadata(ctx, metadata)
 }

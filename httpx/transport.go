@@ -13,6 +13,8 @@ import (
 	"github.com/wwq-2020/go.common/bus"
 	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/log"
+	"github.com/wwq-2020/go.common/stack"
+	"github.com/wwq-2020/go.common/tracing"
 	"github.com/wwq-2020/go.common/util"
 )
 
@@ -45,7 +47,7 @@ var (
 
 // DefaultTransport DefaultTransport
 func DefaultTransport() http.RoundTripper {
-	return Transport(defaultTransportConf)
+	return MakeTransport(defaultTransportConf)
 }
 
 type retriableTransport struct {
@@ -57,14 +59,31 @@ type retriableTransport struct {
 func (rt *retriableTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var saved []byte
 	var err error
-	if rt.maxRetry > 0 && req.Body != nil {
+	ctx := req.Context()
+	stack := stack.New()
+	stack.Set("httpmethod", req.Method).
+		Set("url", req.URL.String())
+	span, ctx := tracing.StartSpan(ctx, "RoundTrip")
+	defer span.FinishWithFields(&err, stack)
+	req = req.WithContext(ctx)
+	span.InjectToHTTPReq(req)
+	if req.Body != nil {
 		saved, err = ioutil.ReadAll(req.Body)
 		if err != nil {
 			return nil, errorsx.Trace(err)
 		}
+		stack.Set("reqBody", string(saved))
 	}
+	start := time.Now()
+	stack.Set("invokeStart", start.Format("2006-01-02 15:04:05"))
+
 	var resp *http.Response
 	for i := 0; i < rt.maxRetry; i++ {
+		curTime := time.Now()
+		stack.Set("curTime", curTime.Format("2006-01-02 15:04:05"))
+		stack.Set("retries", i)
+		log.WithFields(stack).
+			InfoContext(ctx, "start invoke")
 		req.Body = io.NopCloser(bytes.NewBuffer(saved))
 		resp, err = rt.rt.RoundTrip(req)
 		retry := rt.retryCheck(req, resp, err)
@@ -75,9 +94,28 @@ func (rt *retriableTransport) RoundTrip(req *http.Request) (*http.Response, erro
 		if err != nil {
 			return nil, errorsx.Trace(err)
 		}
-		return resp, nil
+		goto end
 	}
+end:
 	if resp != nil {
+		respData, respBody, err := DrainBody(resp.Body)
+		if err != nil {
+			return nil, errorsx.Trace(err)
+		}
+		resp.Body = respBody
+
+		end := time.Now()
+		elapsed := end.Sub(start).Milliseconds()
+		respDataStr := string(respData)
+		stack.Set("respData", respDataStr).
+			Set("elapsed", elapsed).
+			Set("httpStatusCode", resp.StatusCode).
+			Set("invokeFinish", end.Format("2006-01-02 15:04:05"))
+		log.WithField("respData", respDataStr).
+			WithField("elapsed", elapsed).
+			WithField("httpStatusCode", resp.StatusCode).
+			WithField("invokeFinish", end.Format("2006-01-02 15:04:05")).
+			InfoContext(ctx, "invoke finish")
 		return resp, nil
 	}
 	return nil, errorsx.Trace(err)
@@ -192,8 +230,8 @@ var (
 	}
 )
 
-// Transport Transport
-func Transport(transportConf *TransportConf) http.RoundTripper {
+// MakeTransport MakeTransport
+func MakeTransport(transportConf *TransportConf) http.RoundTripper {
 	if transportConf == nil {
 		transportConf = defaultTransportConf
 	}
@@ -214,18 +252,18 @@ func Transport(transportConf *TransportConf) http.RoundTripper {
 			}
 			return conn, nil
 		},
-		DisableKeepAlives:      *transportConf.DisableKeepAlives,
-		DisableCompression:     *transportConf.DisableCompression,
-		MaxIdleConns:           *transportConf.MaxIdleConns,
-		MaxIdleConnsPerHost:    *transportConf.MaxIdleConnsPerHost,
-		MaxConnsPerHost:        *transportConf.MaxConnsPerHost,
+		DisableKeepAlives:      DefaultDisableKeepAlives,
+		DisableCompression:     DefaultDisableCompression,
+		MaxIdleConns:           DefaultMaxIdleConns,
+		MaxIdleConnsPerHost:    DefaultMaxIdleConnsPerHost,
+		MaxConnsPerHost:        DefaultMaxConnsPerHost,
 		IdleConnTimeout:        DefaultIdleConnTimeout,
 		ResponseHeaderTimeout:  DefaultResponseHeaderTimeout,
 		ExpectContinueTimeout:  DefaultExpectContinueTimeout,
 		MaxResponseHeaderBytes: DefaultMaxResponseHeaderBytes,
 		WriteBufferSize:        DefaultWriteBufferSize,
 		ReadBufferSize:         DefaultReadBufferSize,
-		ForceAttemptHTTP2:      *transportConf.ForceAttemptHTTP2,
+		ForceAttemptHTTP2:      DefaultForceAttemptHTTP2,
 	}
 
 	dialTimeout, err := time.ParseDuration(*transportConf.DialTimeout)
@@ -255,6 +293,21 @@ func Transport(transportConf *TransportConf) http.RoundTripper {
 		return conn, nil
 	}
 
+	if transportConf.DisableKeepAlives != nil {
+		rt.DisableKeepAlives = *transportConf.DisableKeepAlives
+	}
+	if transportConf.DisableCompression != nil {
+		rt.DisableCompression = *transportConf.DisableCompression
+	}
+	if transportConf.MaxIdleConns != nil && *transportConf.MaxIdleConns >= 0 {
+		rt.MaxIdleConns = *transportConf.MaxIdleConns
+	}
+	if transportConf.MaxIdleConnsPerHost != nil && *transportConf.MaxIdleConnsPerHost >= 0 {
+		rt.MaxIdleConnsPerHost = *transportConf.MaxIdleConnsPerHost
+	}
+	if transportConf.MaxConnsPerHost != nil && *transportConf.MaxConnsPerHost >= 0 {
+		rt.MaxConnsPerHost = *transportConf.MaxConnsPerHost
+	}
 	idleConnTimeout, err := time.ParseDuration(*transportConf.IdleConnTimeout)
 	if err == nil && idleConnTimeout != 0 {
 		rt.IdleConnTimeout = idleConnTimeout
@@ -304,6 +357,9 @@ func Transport(transportConf *TransportConf) http.RoundTripper {
 		log.WithField("read_buffer_size", transportConf.ReadBufferSize).
 			Error(err)
 	}
+	if transportConf.ForceAttemptHTTP2 != nil {
+		rt.ForceAttemptHTTP2 = *transportConf.ForceAttemptHTTP2
+	}
 
 	return &retriableTransport{
 		rt:         rt,
@@ -316,23 +372,35 @@ type changableTransport struct {
 	rt atomic.Value
 }
 
-func (crt *changableTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	resp, err := crt.rt.Load().(http.RoundTripper).RoundTrip(req)
+func (ct *changableTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := ct.rt.Load().(http.RoundTripper).RoundTrip(req)
 	if err != nil {
 		return nil, errorsx.Trace(err)
 	}
 	return resp, nil
 }
 
-// ChangableTransport ChangableTransport
-func ChangableTransport(ctx context.Context, ch chan struct{}, getter func() *TransportConf) http.RoundTripper {
-	crt := &changableTransport{}
-	callback := func() {
-		transportConf := getter()
-		rt := Transport(transportConf)
-		crt.rt.Store(rt)
+// MakeChangableTransport MakeChangableTransport
+func MakeChangableTransport(ctx context.Context, ch <-chan *TransportConf) http.RoundTripper {
+	ct := &changableTransport{}
+	callback := func(transportConf *TransportConf) {
+		transport := MakeTransport(transportConf)
+		ct.rt.Store(transport)
 	}
-	callback()
+	transportConf := <-ch
+	callback(transportConf)
 	bus.SubscribeChans(ctx, ch, callback)
-	return crt
+	return ct
+}
+
+// ChangableTransport ChangableTransport
+func ChangableTransport(ctx context.Context, ch <-chan http.RoundTripper) http.RoundTripper {
+	ct := &changableTransport{}
+	callback := func(transport http.RoundTripper) {
+		ct.rt.Store(transport)
+	}
+	transport := <-ch
+	callback(transport)
+	bus.SubscribeChans(ctx, ch, callback)
+	return ct
 }

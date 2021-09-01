@@ -64,8 +64,8 @@ var defaultServerConf = &ServerConf{
 	MaxHeaderBytes:    &DefaultServerMaxHeaderBytesStr,
 }
 
-// Server Server
-func Server(conf *ServerConf) *http.Server {
+// MakeServer MakeServer
+func MakeServer(conf *ServerConf) *http.Server {
 	if conf == nil {
 		conf = defaultServerConf
 	}
@@ -80,7 +80,7 @@ func Server(conf *ServerConf) *http.Server {
 		MaxHeaderBytes:    DefaultServerMaxHeaderBytes,
 	}
 	readTimeout, err := time.ParseDuration(*conf.ReadTimeout)
-	if err == nil && readTimeout != 0 {
+	if err == nil && readTimeout > 0 {
 		server.ReadTimeout = readTimeout
 	}
 	if err != nil {
@@ -88,7 +88,7 @@ func Server(conf *ServerConf) *http.Server {
 			Error(err)
 	}
 	readHeaderTimeout, err := time.ParseDuration(*conf.ReadHeaderTimeout)
-	if err == nil && readHeaderTimeout != 0 {
+	if err == nil && readHeaderTimeout > 0 {
 		server.ReadHeaderTimeout = readHeaderTimeout
 	}
 	if err != nil {
@@ -96,7 +96,7 @@ func Server(conf *ServerConf) *http.Server {
 			Error(err)
 	}
 	writeTimeout, err := time.ParseDuration(*conf.WriteTimeout)
-	if err == nil && writeTimeout != 0 {
+	if err == nil && writeTimeout > 0 {
 		server.WriteTimeout = writeTimeout
 	}
 	if err != nil {
@@ -104,7 +104,7 @@ func Server(conf *ServerConf) *http.Server {
 			Error(err)
 	}
 	idleTimeout, err := time.ParseDuration(*conf.IdleTimeout)
-	if err == nil && idleTimeout != 0 {
+	if err == nil && idleTimeout > 0 {
 		server.IdleTimeout = idleTimeout
 	}
 	if err != nil {
@@ -113,7 +113,7 @@ func Server(conf *ServerConf) *http.Server {
 	}
 
 	maxHeaderBytes, err := util.ParseByteStr(*conf.MaxHeaderBytes)
-	if err == nil && maxHeaderBytes != 0 {
+	if err == nil && maxHeaderBytes > 0 {
 		server.MaxHeaderBytes = int(maxHeaderBytes)
 	}
 	if err != nil {
@@ -125,5 +125,5 @@ func Server(conf *ServerConf) *http.Server {
 
 // DefaultServer DefaultServer
 func DefaultServer() *http.Server {
-	return Server(defaultServerConf)
+	return MakeServer(defaultServerConf)
 }

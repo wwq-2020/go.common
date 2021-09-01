@@ -3,12 +3,8 @@ package errorsx
 import (
 	"errors"
 
+	"github.com/wwq-2020/go.common/errcode"
 	"github.com/wwq-2020/go.common/stack"
-)
-
-// consts
-const (
-	UnknownCode int = -1
 )
 
 // timeout timeout
@@ -25,38 +21,38 @@ type stackError struct {
 	fields stack.Fields
 	stack  string
 	err    error
-	code   int
+	code   errcode.ErrCode
 	tip    string
 }
 
 // New New
 func New(msg string) error {
-	return trace(errors.New(msg), UnknownCode, nil)
+	return trace(errors.New(msg), errcode.ErrCode_Unknown, nil)
 }
 
 // NewWithFields NewWithFields
 func NewWithFields(msg string, fields stack.Fields) error {
-	return trace(errors.New(msg), UnknownCode, fields)
+	return trace(errors.New(msg), errcode.ErrCode_Unknown, fields)
 }
 
 // NewWithField NewWithField
 func NewWithField(msg string, key string, val interface{}) error {
 	fields := stack.New().Set(key, val)
-	return trace(errors.New(msg), UnknownCode, fields)
+	return trace(errors.New(msg), errcode.ErrCode_Unknown, fields)
 }
 
 // NewWithCode NewWithCode
-func NewWithCode(msg string, code int) error {
+func NewWithCode(msg string, code errcode.ErrCode) error {
 	return trace(errors.New(msg), code, nil)
 }
 
 // NewWithCodeWithFields NewWithCodeWithFields
-func NewWithCodeWithFields(msg string, code int, fields stack.Fields) error {
+func NewWithCodeWithFields(msg string, code errcode.ErrCode, fields stack.Fields) error {
 	return trace(errors.New(msg), code, fields)
 }
 
 // NewWithCodeWithField NewWithCodeWithField
-func NewWithCodeWithField(msg string, code int, key string, val interface{}) error {
+func NewWithCodeWithField(msg string, code errcode.ErrCode, key string, val interface{}) error {
 	fields := stack.New().Set(key, val)
 	return trace(errors.New(msg), code, fields)
 }
@@ -66,7 +62,7 @@ func Trace(err error) error {
 	if err == nil {
 		return nil
 	}
-	return trace(err, UnknownCode, nil)
+	return trace(err, errcode.ErrCode_Unknown, nil)
 }
 
 // Std Std
@@ -74,7 +70,7 @@ func Std(msg string) error {
 	return errors.New(msg)
 }
 
-func trace(err error, code int, fields stack.Fields) error {
+func trace(err error, code errcode.ErrCode, fields stack.Fields) error {
 	se, ok := err.(*stackError)
 	if !ok {
 		stackFrame := stack.Callers(stack.StdFilter)
@@ -141,17 +137,17 @@ func (s *stackError) Error() string {
 	return s.err.Error()
 }
 
-func (s *stackError) CodeIs(code int) bool {
+func (s *stackError) CodeIs(code errcode.ErrCode) bool {
 	return s.code == code
 }
 
-func (s *stackError) Code() int {
+func (s *stackError) Code() errcode.ErrCode {
 	return s.code
 }
 
 // TraceWithFields TraceWithFields
 func TraceWithFields(err error, fields stack.Fields) error {
-	return trace(err, UnknownCode, fields)
+	return trace(err, errcode.ErrCode_Unknown, fields)
 }
 
 // TraceWithField TraceWithField
@@ -161,17 +157,17 @@ func TraceWithField(err error, key string, val interface{}) error {
 }
 
 // TraceWithCode TraceWithCode
-func TraceWithCode(err error, code int) error {
+func TraceWithCode(err error, code errcode.ErrCode) error {
 	return trace(err, code, nil)
 }
 
 // TraceWithCodeWithField TraceWithCodeWithField
-func TraceWithCodeWithField(err error, code int, key string, val interface{}) error {
+func TraceWithCodeWithField(err error, code errcode.ErrCode, key string, val interface{}) error {
 	return trace(err, code, nil)
 }
 
 // TraceWithCodeWithFields TraceWithCodeWithFields
-func TraceWithCodeWithFields(err error, code int, fields stack.Fields) error {
+func TraceWithCodeWithFields(err error, code errcode.ErrCode, fields stack.Fields) error {
 	return trace(err, code, fields)
 }
 
@@ -238,29 +234,29 @@ func CanAs(err error) bool {
 func Replace(raw, err error) error {
 	se, ok := raw.(*stackError)
 	if !ok {
-		return trace(err, UnknownCode, nil)
+		return trace(err, errcode.ErrCode_Unknown, nil)
 	}
 	se.err = err
 	return se
 }
 
 // CodeIs CodeIs
-func CodeIs(err error, code int) bool {
+func CodeIs(err error, code errcode.ErrCode) bool {
 	se, ok := err.(*stackError)
 	return ok && se.CodeIs(code)
 }
 
 // Code Code
-func Code(err error) int {
+func Code(err error) errcode.ErrCode {
 	se, ok := err.(*stackError)
 	if !ok {
-		return UnknownCode
+		return errcode.ErrCode_Unknown
 	}
 	return se.Code()
 }
 
 // ReplaceCode ReplaceCode
-func ReplaceCode(raw error, code int) error {
+func ReplaceCode(raw error, code errcode.ErrCode) error {
 	se, ok := raw.(*stackError)
 	if !ok {
 		return trace(raw, code, nil)
@@ -270,7 +266,7 @@ func ReplaceCode(raw error, code int) error {
 }
 
 // ReplaceCodeWithFields ReplaceCodeWithFields
-func ReplaceCodeWithFields(raw error, code int, fields stack.Fields) error {
+func ReplaceCodeWithFields(raw error, code errcode.ErrCode, fields stack.Fields) error {
 	se, ok := raw.(*stackError)
 	if !ok {
 		return trace(raw, code, fields)
@@ -281,7 +277,7 @@ func ReplaceCodeWithFields(raw error, code int, fields stack.Fields) error {
 }
 
 // ReplaceCodeWithField ReplaceCodeWithField
-func ReplaceCodeWithField(raw error, code int, key, value string) error {
+func ReplaceCodeWithField(raw error, code errcode.ErrCode, key, value string) error {
 	se, ok := raw.(*stackError)
 	if !ok {
 		fields := stack.New().Set(key, value)

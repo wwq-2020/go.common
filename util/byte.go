@@ -2,11 +2,11 @@ package util
 
 import (
 	"fmt"
+	"github.com/wwq-2020/go.common/errorsx"
 	"math"
 	"regexp"
 	"strconv"
 	"strings"
-	"github.com/wwq-2020/go.common/errorsx"
 )
 
 var (
