@@ -86,7 +86,7 @@ func NewServer(name string, conf *ServerConf, opts ...ServerOption) Server {
 
 // Start Start
 func (s *server) Start() error {
-	if err := s.server.ListenAndServe(); err != nil {
+	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return errorsx.Trace(err)
 	}
 	return nil

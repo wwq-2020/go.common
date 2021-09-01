@@ -261,11 +261,14 @@ func Wait() {
 	setupOnce.Do(setup)
 	select {
 	case <-Done():
-		Close()
+		globalApp.Close()
+		globalApp.Wait()
+		log.Info("grace exit")
 		return
 	default:
 	}
 	globalApp.Wait()
+	log.Info("grace exit")
 }
 
 // Close 结束应用
