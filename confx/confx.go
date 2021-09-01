@@ -128,6 +128,10 @@ func walk(t reflect.Type, v reflect.Value, ancestors []string, tag string, walke
 		t = t.Elem()
 	}
 	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			key := strings.Join(ancestors, ".")
+			return errorsx.TraceWithField(EmptyKey, "key", key)
+		}
 		v = v.Elem()
 	}
 	for i := 0; i < t.NumField(); i++ {

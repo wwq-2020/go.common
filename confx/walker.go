@@ -9,6 +9,7 @@ import (
 // errs
 var (
 	ErrKeyNil = errorsx.Std("key nil")
+	EmptyKey  = errorsx.Std("empty key")
 )
 
 // Walker Walker
