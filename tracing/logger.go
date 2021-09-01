@@ -9,5 +9,5 @@ func (l *jaegerLogger) Error(msg string) {
 }
 
 func (l *jaegerLogger) Infof(msg string, args ...interface{}) {
-	log.Infof(msg, args)
+	log.Infof(msg, args...)
 }
