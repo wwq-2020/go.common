@@ -11,3 +11,7 @@ func (l *jaegerLogger) Error(msg string) {
 func (l *jaegerLogger) Infof(msg string, args ...interface{}) {
 	log.Infof(msg, args...)
 }
+
+func (l *jaegerLogger) Debugf(msg string, args ...interface{}) {
+	log.Debugf(msg, args...)
+}
