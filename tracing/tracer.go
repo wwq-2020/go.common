@@ -171,11 +171,13 @@ func startSpan(ctx context.Context, operationName string) (opentracing.Span, con
 	tracer := opentracing.GlobalTracer()
 	if options != nil && options.Root {
 		span := tracer.StartSpan(operationName)
+		ctx = ContextWithRootOptions(ctx, false)
 		return span, opentracing.ContextWithSpan(ctx, span)
 	}
 	parentSpan := opentracing.SpanFromContext(ctx)
 	if parentSpan == nil {
 		span := tracer.StartSpan(operationName)
+		ctx = ContextWithRootOptions(ctx, false)
 		return span, opentracing.ContextWithSpan(ctx, span)
 	}
 
@@ -194,6 +196,7 @@ func startSpan(ctx context.Context, operationName string) (opentracing.Span, con
 	}
 start:
 	span := tracer.StartSpan(operationName, tracingOptions...)
+	ctx = ContextWithRootOptions(ctx, false)
 	return span, opentracing.ContextWithSpan(ctx, span)
 }
 
