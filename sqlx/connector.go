@@ -37,3 +37,16 @@ func NewConnector(dsn string, driver driver.Driver) driver.Connector {
 		driver: WrapDriver(driver),
 	}
 }
+
+// NewMysqlStdConnector NewMysqlStdConnector
+func NewMysqlStdConnector(dsn string) driver.Connector {
+	return NewStdConnector(dsn, &mysql.MySQLDriver{})
+}
+
+// NewStdConnector NewStdConnector
+func NewStdConnector(dsn string, driver driver.Driver) driver.Connector {
+	return &dsnConnector{
+		dsn:    dsn,
+		driver: driver,
+	}
+}

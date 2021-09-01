@@ -203,16 +203,17 @@ func StartSpan(ctx context.Context, operationName string) (Span, context.Context
 	tracer := opentracing.GlobalTracer()
 	if tracer == noopTracer {
 		ctx := log.ContextEnsureTraceIDWithGen(ctx, log.GenTraceID)
-		return newSpan(opentracingSpan), ctx
+		span := newSpan(opentracingSpan)
+		return span, ContextWitSpan(ctx, span)
 	}
 	traceID := traceIDFromOpentracingSpan(opentracingSpan)
 	ctx = log.ContextWithTraceID(ctx, traceID)
-	return newSpan(opentracingSpan), ctx
+	span := newSpan(opentracingSpan)
+	return span, ContextWitSpan(ctx, span)
 }
 
 // HTTPServerStartSpan HTTPServerStartSpan
 func HTTPServerStartSpan(ctx context.Context, operationName string, httpReq *http.Request, w http.ResponseWriter) (Span, context.Context) {
-	options := OptionsFromContext(ctx)
 
 	tracer := opentracing.GlobalTracer()
 	if tracer == noopTracer {
@@ -228,12 +229,13 @@ func HTTPServerStartSpan(ctx context.Context, operationName string, httpReq *htt
 		}
 		span := newSpan(opentracingSpan)
 		span.InjectToHTTPResponse(ctx, w)
-		return span, opentracing.ContextWithSpan(ctx, opentracingSpan)
+		ctx = opentracing.ContextWithSpan(ctx, opentracingSpan)
+		ctx = ContextWithRootOptions(ctx, false)
+		return span, ContextWitSpan(ctx, span)
 	}
-	if options == nil {
-		ctx = ContextWithRootOptions(ctx, true)
-	}
+	ctx = ContextWithRootOptions(ctx, true)
 	span, ctx := StartSpan(ctx, operationName)
+	ctx = ContextWithRootOptions(ctx, false)
 	span.InjectToHTTPResponse(ctx, w)
 	return span, ctx
 }
@@ -352,4 +354,20 @@ func ContextWithSpanTypeOptionsx(ctx context.Context, spanType SpanType) (contex
 	ctx, options := ContextEnsureOptionsx(ctx)
 	options.SpanType = spanType
 	return ctx, options
+}
+
+type spanKey struct{}
+
+// ContextWitSpan ContextWitSpan
+func ContextWitSpan(ctx context.Context, span Span) context.Context {
+	return context.WithValue(ctx, spanKey{}, span)
+}
+
+// SpanFromContext ContextWitSpan
+func SpanFromContext(ctx context.Context) Span {
+	value := ctx.Value(spanKey{})
+	if value == nil {
+		return nil
+	}
+	return value.(Span)
 }

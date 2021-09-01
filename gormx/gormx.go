@@ -18,7 +18,8 @@ type Conf struct {
 func MustOpen(conf *Conf) *gorm.DB {
 	db, err := Open(conf)
 	if err != nil {
-		log.Fatalf("failed to Open,err:%v", err)
+		log.WithError(err).
+			Fatalf("failed to Open,err:%v", err)
 	}
 	return db
 }
@@ -40,5 +41,6 @@ func Open(conf *Conf) (*gorm.DB, error) {
 	if err != nil {
 		return nil, errorsx.Trace(err)
 	}
+	// gormDB.Use(&TracingPlugin{})
 	return gormDB, nil
 }
