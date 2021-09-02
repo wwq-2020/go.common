@@ -177,7 +177,16 @@ func (app *App) Close() {
 
 // Wait 等待应用goroutine全部退出
 func (app *App) Wait() {
+	select {
+	case <-app.Done():
+		app.Close()
+		app.wg.Wait()
+		log.Info("grace exit")
+		return
+	default:
+	}
 	app.wg.Wait()
+	log.Info("grace exit")
 }
 
 // AddChild 添加子应用
@@ -259,16 +268,7 @@ func GoAsync(f func()) {
 // Wait 等待应用goroutine全部退出
 func Wait() {
 	setupOnce.Do(setup)
-	select {
-	case <-Done():
-		globalApp.Close()
-		globalApp.Wait()
-		log.Info("grace exit")
-		return
-	default:
-	}
 	globalApp.Wait()
-	log.Info("grace exit")
 }
 
 // Close 结束应用
