@@ -13,10 +13,10 @@ type Router interface {
 }
 
 // RouterFactory RouterFactory
-type RouterFactory func(name string) Router
+type RouterFactory func() Router
 
 // NewRouter NewRouter
-func NewRouter(name string) Router {
+func NewRouter() Router {
 	return &router{
 		m:               make(map[string]http.Handler, 100),
 		NotFoundHandler: http.NotFoundHandler(),

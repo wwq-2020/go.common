@@ -61,7 +61,7 @@ var defaultServerConf = &ServerConf{
 }
 
 // NewServer NewServer
-func NewServer(name string, conf *ServerConf, opts ...ServerOption) Server {
+func NewServer(conf *ServerConf, opts ...ServerOption) Server {
 	if conf == nil {
 		conf = defaultServerConf
 	}
@@ -70,12 +70,10 @@ func NewServer(name string, conf *ServerConf, opts ...ServerOption) Server {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	router := options.routerFactory(name)
-	wrappedHandler := wrapHTTPHandler(router)
+	wrappedHandler := wrapHTTPHandler(options.router)
 	return &server{
-		name:   name,
 		addr:   conf.Addr,
-		router: router,
+		router: options.router,
 		server: &http.Server{
 			Addr:    conf.Addr,
 			Handler: wrappedHandler,
