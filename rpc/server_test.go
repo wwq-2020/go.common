@@ -29,7 +29,7 @@ func (r *resp) UnWrap() bool {
 }
 
 func TestServer(t *testing.T) {
-	s := rpc.NewServer("aa", nil)
+	s := rpc.NewServer(nil)
 
 	type req struct {
 		Data string
