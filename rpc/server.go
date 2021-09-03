@@ -119,6 +119,10 @@ func (s *server) Handle(path string, handler interceptor.MethodHandler, intercep
 	s.router.Handle(path, wrappedHandler)
 }
 
+func (s *server) HandleNotFound(handler http.Handler) {
+	s.router.HandleNotFound(wrapHTTPHandler(handler))
+}
+
 func (s *server) wrapHandler(h interceptor.MethodHandler, interceptors ...interceptor.ServerInterceptor) http.HandlerFunc {
 	interceptor := interceptor.ChainServerInerceptor(append(s.options.interceptors, interceptors...)...)
 	return func(w http.ResponseWriter, req *http.Request) {
