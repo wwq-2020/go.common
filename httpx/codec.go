@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/wwq-2020/go.common/errorsx"
-	"github.com/wwq-2020/go.common/stack"
 )
 
 // Codec Codec
@@ -70,8 +69,9 @@ func (c *codeMsgJSONCodec) Decode(data []byte, obj interface{}) error {
 		return errorsx.Trace(err)
 	}
 	if respObj.Code != c.expectedCode {
-		stack := stack.New().Set("expectedCode", c.expectedCode).Set("gotCode", respObj.Code)
-		return errorsx.NewWithFields("got unexpected code", stack)
+		return errorsx.New("got unexpected code").
+			WithField("expectedCode", c.expectedCode).
+			WithField("gotCode", respObj.Code)
 	}
 	return nil
 }

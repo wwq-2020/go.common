@@ -12,7 +12,6 @@ import (
 	"github.com/wwq-2020/go.common/errcode"
 	"github.com/wwq-2020/go.common/errorsx"
 	"github.com/wwq-2020/go.common/httpx"
-	"github.com/wwq-2020/go.common/stack"
 )
 
 // Client Client
@@ -93,7 +92,7 @@ func (c *client) Invoke(ctx context.Context, path string, req, resp interface{},
 		return errorsx.Trace(err)
 	}
 	if httpResp.StatusCode != http.StatusOK {
-		return errorsx.NewWithField("unexpected statuscode", "statuscode", errcode.ErrCode(httpResp.StatusCode))
+		return errorsx.New("unexpected statuscode").WithField("statuscode", errcode.ErrCode(httpResp.StatusCode))
 	}
 
 	respData, respBody, err := httpx.DrainBody(httpResp.Body)
@@ -111,10 +110,9 @@ func (c *client) Invoke(ctx context.Context, path string, req, resp interface{},
 			return errorsx.Trace(err)
 		}
 		if gotResp.Code != options.expectedCode {
-			stack := stack.New().
-				Set("expectedcode", options.expectedCode).
-				Set("gotcode", gotResp.Code)
-			return errorsx.NewWithFields("got unexpected code", stack)
+			return errorsx.New("got unexpected code").
+				WithField("expectedcode", options.expectedCode).
+				WithField("gotcode", gotResp.Code)
 		}
 		return nil
 	}

@@ -767,7 +767,7 @@ func (l *logger) WithZapFields(fields ...zap.Field) Logger {
 
 // WithError WithError
 func (l *logger) WithError(err error) Logger {
-	stack := errorsx.AllFields(err)
+	stack := errorsx.FullFields(err)
 	options := *l.options
 	return &logger{
 		l:         l.l.With(fields2ZapFields(stack)...),

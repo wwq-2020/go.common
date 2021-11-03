@@ -2,15 +2,17 @@ package stack
 
 import (
 	"fmt"
+	"go/build"
 	"os"
 	"runtime"
 	"strings"
 )
 
 var (
-	wd        string
-	modPrefix string
-	gopath    = os.Getenv("GOPATH")
+	wd     string
+	goROOT = build.Default.GOROOT
+	goPath = build.Default.GOPATH
+	goStd  = goROOT + "/src"
 )
 
 func init() {
@@ -48,9 +50,7 @@ next:
 		if filter(file) {
 			goto next
 		}
-
 		line := frame.Line
-
 		stack = append(stack, fmt.Sprintf("%s@%s:%d", function, file, line))
 		goto next
 	}
@@ -73,20 +73,15 @@ func trimFunction(src string) string {
 }
 
 func trimFile(src string) string {
-	if gopath != "" {
-		src = strings.TrimPrefix(src, gopath+"/pkg/mod/")
-	}
-
+	src = strings.TrimPrefix(src, goPath+"/pkg/mod/")
 	return strings.TrimPrefix(src, wd)
 }
 
 func stackfilter(src string) bool {
 	return strings.Contains(src, "github.com/wwq-2020/go.common")
-
 }
 
 // StdFilter StdFilters
 func StdFilter(src string) bool {
-	goRoot := os.Getenv("GOROOT")
-	return goRoot != "" && strings.Contains(src, goRoot+"/src")
+	return strings.Contains(src, goStd)
 }

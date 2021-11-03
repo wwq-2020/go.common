@@ -7,6 +7,19 @@ import (
 	"github.com/wwq-2020/go.common/stack"
 )
 
+type StackError interface {
+	error
+	WithCode(errcode.ErrCode) StackError
+	Code() errcode.ErrCode
+	CodeIs(errcode.ErrCode) bool
+	WithField(string, interface{}) StackError
+	WithFields(stack.Fields) StackError
+	Fields() stack.Fields
+	FullFields() stack.Fields
+	WithTip(string) StackError
+	Tip() string
+}
+
 // timeout timeout
 type timeout interface {
 	Timeout() bool
@@ -26,43 +39,13 @@ type stackError struct {
 }
 
 // New New
-func New(msg string) error {
+func New(msg string) StackError {
 	return trace(errors.New(msg), errcode.ErrCode_Unknown, nil)
 }
 
-// NewWithFields NewWithFields
-func NewWithFields(msg string, fields stack.Fields) error {
-	return trace(errors.New(msg), errcode.ErrCode_Unknown, fields)
-}
-
-// NewWithField NewWithField
-func NewWithField(msg string, key string, val interface{}) error {
-	fields := stack.New().Set(key, val)
-	return trace(errors.New(msg), errcode.ErrCode_Unknown, fields)
-}
-
-// NewWithCode NewWithCode
-func NewWithCode(msg string, code errcode.ErrCode) error {
-	return trace(errors.New(msg), code, nil)
-}
-
-// NewWithCodeWithFields NewWithCodeWithFields
-func NewWithCodeWithFields(msg string, code errcode.ErrCode, fields stack.Fields) error {
-	return trace(errors.New(msg), code, fields)
-}
-
-// NewWithCodeWithField NewWithCodeWithField
-func NewWithCodeWithField(msg string, code errcode.ErrCode, key string, val interface{}) error {
-	fields := stack.New().Set(key, val)
-	return trace(errors.New(msg), code, fields)
-}
-
 // Trace Trace
-func Trace(err error) error {
-	if err == nil {
-		return nil
-	}
-	return trace(err, errcode.ErrCode_Unknown, nil)
+func Trace(err error) StackError {
+	return As(err)
 }
 
 // Std Std
@@ -70,7 +53,7 @@ func Std(msg string) error {
 	return errors.New(msg)
 }
 
-func trace(err error, code errcode.ErrCode, fields stack.Fields) error {
+func trace(err error, code errcode.ErrCode, fields stack.Fields) StackError {
 	se, ok := err.(*stackError)
 	if !ok {
 		stackFrame := stack.Callers(stack.StdFilter)
@@ -94,33 +77,24 @@ func trace(err error, code errcode.ErrCode, fields stack.Fields) error {
 	return se
 }
 
-// WithField WithField
-func (s *stackError) WithField(key string, val interface{}) {
+func (s *stackError) WithField(key string, val interface{}) StackError {
 	s.fields.Set(key, val)
+	return s
 }
 
-// WithField WithFields
-func (s *stackError) WithFields(fields stack.Fields) {
+func (s *stackError) WithFields(fields stack.Fields) StackError {
 	s.fields = s.fields.Merge(fields)
+	return s
 }
 
-// Fields Fields
 func (s *stackError) Fields() stack.Fields {
 	return s.fields
 }
 
-// StackFields StackFields
-func (s *stackError) StackFields() stack.Fields {
-	stack := stack.New().Set("stack", s.stack)
-	stack = stack.Merge(s.fields)
-	return stack
-}
-
-// FullFields FullFields
-func (s *stackError) AllFields() stack.Fields {
+func (s *stackError) FullFields() stack.Fields {
 	stack := stack.New().
 		Set("stack", s.stack).
-		Set("err", s.err.Error())
+		Set("tip", s.tip)
 	stack = stack.Merge(s.fields)
 	return stack
 }
@@ -141,49 +115,48 @@ func (s *stackError) CodeIs(code errcode.ErrCode) bool {
 	return s.code == code
 }
 
+func (s *stackError) WithCode(code errcode.ErrCode) StackError {
+	s.code = code
+	return s
+}
+
 func (s *stackError) Code() errcode.ErrCode {
 	return s.code
 }
 
-// TraceWithFields TraceWithFields
-func TraceWithFields(err error, fields stack.Fields) error {
-	return trace(err, errcode.ErrCode_Unknown, fields)
+func (s *stackError) WithTip(tip string) StackError {
+	s.tip = tip
+	return s
 }
 
-// TraceWithField TraceWithField
-func TraceWithField(err error, key string, val interface{}) error {
-	fields := stack.New().Set(key, val)
-	return TraceWithFields(err, fields)
-}
-
-// TraceWithCode TraceWithCode
-func TraceWithCode(err error, code errcode.ErrCode) error {
-	return trace(err, code, nil)
-}
-
-// TraceWithCodeWithField TraceWithCodeWithField
-func TraceWithCodeWithField(err error, code errcode.ErrCode, key string, val interface{}) error {
-	return trace(err, code, nil)
-}
-
-// TraceWithCodeWithFields TraceWithCodeWithFields
-func TraceWithCodeWithFields(err error, code errcode.ErrCode, fields stack.Fields) error {
-	return trace(err, code, fields)
+func (s *stackError) Tip() string {
+	return s.tip
 }
 
 // Is Is
-func Is(src, dst error) bool {
+func StdIs(src, dst error) bool {
 	return errors.Is(src, dst)
 }
 
 // Unwrap Unwrap
-func Unwrap(err error) error {
+func StdUnwrap(err error) error {
 	return errors.Unwrap(err)
 }
 
 // As As
-func As(err error, target interface{}) bool {
+func StdAs(err error, target interface{}) bool {
 	return errors.As(err, target)
+}
+
+func As(err error) StackError {
+	if err == nil {
+		return nil
+	}
+	se, ok := err.(StackError)
+	if !ok {
+		return trace(err, errcode.ErrCode_Unknown, nil)
+	}
+	return se
 }
 
 // IsTimeout IsTimeout
@@ -200,131 +173,41 @@ func IsTemporary(err error) bool {
 
 // Fields Fields
 func Fields(err error) stack.Fields {
-	if stackErr, ok := err.(*stackError); ok {
-		return stackErr.Fields()
-	}
-	return stack.New()
+	return As(err).FullFields()
 }
 
-// AllFields AllFields
-func AllFields(err error) stack.Fields {
-	if stackErr, ok := err.(*stackError); ok {
-		return stackErr.AllFields()
-	}
-	return stack.New().Set("err", err.Error())
-}
-
-// StackFields StackFields
-func StackFields(err error) stack.Fields {
-	if stackErr, ok := err.(*stackError); ok {
-		return stackErr.StackFields()
-	}
-	s := stack.New()
-	s.Set("stack", stack.Callers(stack.StdFilter))
-	return s
+// FullFields FullFields
+func FullFields(err error) stack.Fields {
+	return As(err).FullFields()
 }
 
 // CanAs CanAs
 func CanAs(err error) bool {
-	var se *stackError
-	return As(err, &se)
+	var se StackError
+	return StdAs(err, &se)
 }
 
-// Replace Replace
-func Replace(raw, err error) error {
-	se, ok := raw.(*stackError)
-	if !ok {
-		return trace(err, errcode.ErrCode_Unknown, nil)
-	}
-	se.err = err
-	return se
-}
-
-// CodeIs CodeIs
-func CodeIs(err error, code errcode.ErrCode) bool {
-	se, ok := err.(*stackError)
-	return ok && se.CodeIs(code)
+// Code Code
+func CodeIs(err error, errcode errcode.ErrCode) bool {
+	return As(err).CodeIs(errcode)
 }
 
 // Code Code
 func Code(err error) errcode.ErrCode {
-	se, ok := err.(*stackError)
-	if !ok {
-		return errcode.ErrCode_Unknown
-	}
-	return se.Code()
+	return As(err).Code()
 }
 
-// ReplaceCode ReplaceCode
-func ReplaceCode(raw error, code errcode.ErrCode) error {
-	se, ok := raw.(*stackError)
-	if !ok {
-		return trace(raw, code, nil)
-	}
-	se.code = code
-	return se
-}
-
-// ReplaceCodeWithFields ReplaceCodeWithFields
-func ReplaceCodeWithFields(raw error, code errcode.ErrCode, fields stack.Fields) error {
-	se, ok := raw.(*stackError)
-	if !ok {
-		return trace(raw, code, fields)
-	}
-	se.code = code
-	se.fields = se.fields.Merge(fields)
-	return se
-}
-
-// ReplaceCodeWithField ReplaceCodeWithField
-func ReplaceCodeWithField(raw error, code errcode.ErrCode, key, value string) error {
-	se, ok := raw.(*stackError)
-	if !ok {
-		fields := stack.New().Set(key, value)
-		return trace(raw, code, fields)
-	}
-	se.code = code
-	se.fields.Set(key, value)
-	return se
+// WithTip WithTip
+func WithCode(err error, code errcode.ErrCode) StackError {
+	return As(err).WithCode(code)
 }
 
 // Tip Tip
-func Tip(raw error) string {
-	se, ok := raw.(*stackError)
-	if !ok {
-		return raw.Error()
-	}
-	return se.tip
+func Tip(err error) string {
+	return As(err).Tip()
 }
 
-// ReplaceTip ReplaceTip
-func ReplaceTip(raw error, tip string) error {
-	se, ok := raw.(*stackError)
-	if !ok {
-		return errors.New(tip)
-	}
-	se.tip = tip
-	return se
-}
-
-// ReplaceTipWithFields ReplaceTipWithFields
-func ReplaceTipWithFields(raw error, tip string, fields stack.Fields) error {
-	se, ok := raw.(*stackError)
-	if !ok {
-		return NewWithFields(tip, fields)
-	}
-	se.tip = tip
-	se.fields = se.fields.Merge(fields)
-	return se
-}
-
-// ReplaceTipWithField ReplaceTipWithField
-func ReplaceTipWithField(raw error, tip, key, value string) error {
-	se, ok := raw.(*stackError)
-	if !ok {
-		return NewWithField(tip, key, value)
-	}
-	se.tip = tip
-	se.fields.Set(key, value)
-	return se
+// WithTip WithTip
+func WithTip(err error, tip string) StackError {
+	return As(err).WithTip(tip)
 }

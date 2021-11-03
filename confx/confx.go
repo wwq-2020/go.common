@@ -72,7 +72,7 @@ func Parse(data []byte, dest interface{}) error {
 
 		key := strings.Join(keys, ".")
 		if !metadata.IsDefined(keys...) {
-			return errorsx.TraceWithField(ErrKeyNil, "key", key)
+			return errorsx.Trace(ErrKeyNil).WithField("key", key)
 		}
 		return nil
 	})
@@ -127,14 +127,14 @@ func walk(t reflect.Type, v reflect.Value, ancestors []string, tag string, walke
 	if t.Kind() == reflect.Ptr {
 		if v.IsNil() {
 			key := strings.Join(ancestors, ".")
-			return errorsx.TraceWithField(EmptyKey, "key", key)
+			return errorsx.Trace(EmptyKey).WithField("key", key)
 		}
 		t = t.Elem()
 	}
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
 			key := strings.Join(ancestors, ".")
-			return errorsx.TraceWithField(EmptyKey, "key", key)
+			return errorsx.Trace(EmptyKey).WithField("key", key)
 		}
 		v = v.Elem()
 	}

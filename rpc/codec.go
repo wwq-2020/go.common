@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"net/http"
 
 	"github.com/wwq-2020/go.common/errcode"
 	"github.com/wwq-2020/go.common/errorsx"
@@ -70,10 +69,10 @@ func serverCodecFactory(r io.Reader, w io.Writer, codec Codec) ServerCodec {
 func (c *serverCodec) Decode(obj interface{}) error {
 	reqData, err := ioutil.ReadAll(c.r)
 	if err != nil {
-		return errorsx.TraceWithCode(err, http.StatusBadRequest)
+		return errorsx.Trace(err).WithCode(errcode.ErrCode_Internal)
 	}
 	if err := c.codec.Decode(reqData, obj); err != nil {
-		return errorsx.ReplaceCode(err, http.StatusBadRequest)
+		return errorsx.Trace(err).WithCode(errcode.ErrCode_InvalidArgument)
 	}
 	return nil
 }

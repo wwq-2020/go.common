@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/wwq-2020/go.common/errorsx"
-	"github.com/wwq-2020/go.common/stack"
 )
 
 // ReqInterceptor ReqInterceptor
@@ -40,8 +39,9 @@ func StatusCodeRespInterceptor(expected int) RespInterceptor {
 		if got == expected {
 			return nil
 		}
-		stack := stack.New().Set("expected statuscode", expected).Set("got statuscode", got)
-		return errorsx.NewWithFields("statuscode mismatch", stack)
+		return errorsx.New("statuscode mismatch").
+			WithField("expected statuscode", expected).
+			WithField("got statuscode", got)
 	}
 }
 
@@ -50,8 +50,9 @@ func StatusCodeRangeRespInterceptor(codeStart, codeEnd int) RespInterceptor {
 	return func(httpResp *http.Response) error {
 		got := httpResp.StatusCode
 		if got < codeStart || got > codeEnd {
-			stack := stack.New().Set("expected statuscode start", codeStart).Set("expected statuscode end", codeEnd)
-			return errorsx.NewWithFields("statuscode mismatch", stack)
+			return errorsx.New("statuscode mismatch").
+				WithField("expected statuscode start", codeStart).
+				WithField("expected statuscode end", codeEnd)
 		}
 		return nil
 	}

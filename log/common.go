@@ -92,11 +92,6 @@ func zapFieldsFromContext(ctx context.Context) []zap.Field {
 	}
 }
 
-func zapFieldsFromError(err error) []zap.Field {
-	fields := errorsx.StackFields(err)
-	return fields2ZapFields(fields)
-}
-
 func fields2ZapFields(fields stack.Fields) []zap.Field {
 	kvs := fields.KVs()
 	zapFields := make([]zap.Field, 0, len(kvs))
@@ -104,4 +99,9 @@ func fields2ZapFields(fields stack.Fields) []zap.Field {
 		zapFields = append(zapFields, zap.Any(k, v))
 	}
 	return zapFields
+}
+
+func zapFieldsFromError(err error) []zap.Field {
+	fields := errorsx.FullFields(err)
+	return fields2ZapFields(fields)
 }
