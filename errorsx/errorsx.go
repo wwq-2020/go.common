@@ -211,3 +211,11 @@ func Tip(err error) string {
 func WithTip(err error, tip string) StackError {
 	return As(err).WithTip(tip)
 }
+
+func WithField(err error, key string, value interface{}) StackError {
+	return As(err).WithField(key, value)
+}
+
+func WithFields(err error, stack stack.Fields) StackError {
+	return As(err).WithFields(stack)
+}
