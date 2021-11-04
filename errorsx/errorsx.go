@@ -161,14 +161,20 @@ func As(err error) StackError {
 
 // IsTimeout IsTimeout
 func IsTimeout(err error) bool {
-	timeoutErr, ok := err.(timeout)
-	return ok && timeoutErr.Timeout()
+	var timeoutErr timeout
+	if StdAs(err, &timeoutErr) {
+		return timeoutErr.Timeout()
+	}
+	return false
 }
 
 // IsTemporary IsTemporary
 func IsTemporary(err error) bool {
-	temporaryErr, ok := err.(temporary)
-	return ok && temporaryErr.Temporary()
+	var temporaryErr temporary
+	if StdAs(err, &temporaryErr) {
+		return temporaryErr.Temporary()
+	}
+	return false
 }
 
 // Fields Fields
