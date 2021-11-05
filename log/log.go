@@ -153,11 +153,6 @@ func SetLogger(logger Logger) {
 	stdWith = logger
 }
 
-// Std Std
-func Std() Logger {
-	return std
-}
-
 // NewEx 初始化Logger
 func NewEx(depth int, opts ...Option) Logger {
 	options := defaultOptions
