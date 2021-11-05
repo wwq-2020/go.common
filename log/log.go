@@ -413,48 +413,6 @@ func WithStack() Logger {
 	return std.WithStack()
 }
 
-// ContextLoggerSetLevel ContextLoggerSetLevel
-func ContextLoggerSetLevel(ctx context.Context, level Level) {
-	logger := LoggerFromContext(ctx)
-	logger.SetLevel(level)
-}
-
-// ContextLoggerWithFields ContextLoggerWithFields
-func ContextLoggerWithFields(ctx context.Context, fields stack.Fields) Logger {
-	logger := LoggerFromContext(ctx)
-	return logger.WithFields(fields)
-}
-
-// ContextLoggerWithZapFields ContextLoggerWithZapFields
-func ContextLoggerWithZapFields(ctx context.Context, fields ...zap.Field) Logger {
-	logger := LoggerFromContext(ctx)
-	return logger.WithZapFields(fields...)
-}
-
-// ContextLoggerWithFieldsFromErr ContextLoggerWithFieldsFromErr
-func ContextLoggerWithFieldsFromErr(ctx context.Context, err error) Logger {
-	logger := LoggerFromContext(ctx)
-	return logger.WithFields(errorsx.Fields(err))
-}
-
-// ContextLoggerWithFieldsFrom ContextLoggerWithFieldsFrom
-func ContextLoggerWithFieldsFrom(ctx context.Context, fields Fields) Logger {
-	logger := LoggerFromContext(ctx)
-	return logger.WithFields(fields.Fields())
-}
-
-// ContextLoggerWithField ContextLoggerWithField
-func ContextLoggerWithField(ctx context.Context, key string, val interface{}) Logger {
-	logger := LoggerFromContext(ctx)
-	return logger.WithField(key, val)
-}
-
-// ContextLoggerWithError ContextLoggerWithError
-func ContextLoggerWithError(ctx context.Context, err error) Logger {
-	logger := LoggerFromContext(ctx)
-	return logger.WithError(err)
-}
-
 // Infof Infof
 func (l *logger) Infof(msg string, args ...interface{}) {
 	logger := l.l
