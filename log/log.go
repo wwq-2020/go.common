@@ -116,7 +116,6 @@ type logger struct {
 	l         *zap.Logger
 	depth     int
 	options   *Options
-	writer    zapcore.WriteSyncer
 	withStack bool
 }
 
@@ -192,11 +191,6 @@ var (
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 )
-
-type zapLoggerOptions struct {
-	io.Writer
-	level zap.AtomicLevel
-}
 
 func buildZapLogger(options *Options) *zap.Logger {
 	encoder := zapcore.NewJSONEncoder(zapEncoderConfig)
