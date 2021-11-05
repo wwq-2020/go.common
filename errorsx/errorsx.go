@@ -179,7 +179,7 @@ func IsTemporary(err error) bool {
 
 // Fields Fields
 func Fields(err error) stack.Fields {
-	return As(err).FullFields()
+	return As(err).Fields()
 }
 
 // FullFields FullFields
