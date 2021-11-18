@@ -2,6 +2,8 @@ package errorsx
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/wwq-2020/go.common/errcode"
 	"github.com/wwq-2020/go.common/stack"
@@ -133,6 +135,16 @@ func (s *stackError) Tip() string {
 	return s.tip
 }
 
+func (s *stackError) Format() string {
+	b := &strings.Builder{}
+	b.WriteString(s.err.Error())
+	for k, v := range s.fields.KVs() {
+		b.WriteString(fmt.Sprintf(" %s=%v ", k, v))
+	}
+	return b.String()
+
+}
+
 // Is Is
 func StdIs(src, dst error) bool {
 	return errors.Is(src, dst)
@@ -224,4 +236,8 @@ func WithField(err error, key string, value interface{}) StackError {
 
 func WithFields(err error, stack stack.Fields) StackError {
 	return As(err).WithFields(stack)
+}
+
+func Format(err error) string {
+	return As(err).Format()
 }

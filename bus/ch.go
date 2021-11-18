@@ -4,8 +4,8 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/wwq-2020/go.common/app"
 	"github.com/wwq-2020/go.common/log"
+	"github.com/wwq-2020/go.common/syncx"
 )
 
 type callbackFunc struct {
@@ -109,7 +109,7 @@ func BatchSubscribeChansContext(ctx context.Context, chMap map[interface{}]inter
 		hasInput: false,
 	})
 	newCtx, cancel := context.WithCancel(ctx)
-	app.GoAsyncForeverContext(newCtx, func() {
+	syncx.SafeLoopGo(newCtx, func() {
 		for {
 			chosen, recv, ok := reflect.Select(cases)
 			if !ok {
@@ -186,7 +186,7 @@ func AggregateChanContext(ctx context.Context, chs ...interface{}) <-chan struct
 		Chan: ctxChValue,
 	}
 	cases = append(cases, item)
-	app.GoAsync(func() {
+	syncx.SafeGo(func() {
 		for {
 			if chosen, _, ok := reflect.Select(cases); !ok {
 				log.WithField("chosen", chosen).
@@ -223,7 +223,7 @@ func BroadcastChan(revCh interface{}, sendChs ...interface{}) {
 		}
 		values = append(values, value)
 	}
-	app.GoAsync(func() {
+	syncx.SafeGo(func() {
 		for {
 			_, ok := revChValue.Recv()
 			if !ok {

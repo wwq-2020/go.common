@@ -2,14 +2,13 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
 	"github.com/wwq-2020/go.common/log"
-	"github.com/wwq-2020/go.common/stack"
+	"github.com/wwq-2020/go.common/syncx"
 )
 
 var (
@@ -19,6 +18,8 @@ var (
 	GraceExitHook = func() {
 	}
 )
+
+type Hook func(ctx context.Context) context.Context
 
 // App 应用
 type App struct {
@@ -51,113 +52,48 @@ func (app *App) Context() context.Context {
 }
 
 // Go 开启应用goroutine
-func (app *App) Go(f func(context.Context)) {
+func (app *App) Go(f func(context.Context), hooks ...Hook) {
 	wrappedF := func() {
-		f(app.Context())
-	}
-	app.GoAsync(wrappedF)
-}
-
-// GoForever GoForever
-func (app *App) GoForever(f func(context.Context)) {
-	app.wg.Add(1)
-	wrappedF := func() {
-		f(app.Context())
-	}
-	app.GoAsync(func() {
+		app.wg.Add(1)
 		defer app.wg.Done()
-		for {
-			wrappedF()
-			select {
-			case <-app.ctx.Done():
-				return
-			default:
-			}
+		ctx := app.Context()
+		for _, hook := range hooks {
+			ctx = hook(ctx)
 		}
-	})
-}
-
-// withCancel withCancel
-func (app *App) withCancel(ctx context.Context) (context.Context, context.CancelFunc) {
-	app.wg.Add(1)
-	newCtx, cancel := context.WithCancel(ctx)
-	app.GoAsync(func() {
-		defer app.wg.Done()
-		defer cancel()
-		select {
-		case <-newCtx.Done():
-		case <-app.ctx.Done():
-		}
-	})
-	return newCtx, cancel
-}
-
-// GoForeverContext GoForeverContext
-func (app *App) GoForeverContext(ctx context.Context, f func(context.Context)) {
-	newCtx, _ := app.withCancel(ctx)
-	wrappedF := func() {
-		f(newCtx)
+		f(ctx)
 	}
-	app.GoAsyncForeverContext(ctx, wrappedF)
+	syncx.SafeGo(wrappedF)
 }
 
 // GoAsync 开启应用goroutine
 func (app *App) GoAsync(f func()) {
-	app.wg.Add(1)
-	go func() {
-		defer func() {
-			if e := recover(); e != nil {
-				stack := stack.Callers(stack.StdFilter)
-				var err error
-				switch t := e.(type) {
-				case error:
-					err = t
-				default:
-					err = fmt.Errorf("%#v", t)
-				}
-				log.WithField("stack", stack).
-					Error(err)
-			}
-			app.wg.Done()
-		}()
-		f()
-	}()
-}
-
-// GoAsyncForever GoAsyncForever
-func (app *App) GoAsyncForever(f func()) {
-	app.GoAsyncForeverContext(context.Background(), f)
-}
-
-// GoAsyncForeverContext GoAsyncForeverContext
-func (app *App) GoAsyncForeverContext(ctx context.Context, f func()) {
-	app.wg.Add(1)
 	wrappedF := func() {
-		f()
-	}
-	app.GoAsync(func() {
+		app.wg.Add(1)
 		defer app.wg.Done()
-		for {
-			wrappedF()
-			select {
-			case <-app.ctx.Done():
-				return
-			case <-ctx.Done():
-				return
-			default:
-			}
-		}
-	})
+		f()
+	}
+	syncx.SafeGo(wrappedF)
 }
 
-// GoContext 开启应用goroutine,携带context
-func (app *App) GoContext(ctx context.Context, f func(context.Context)) {
-	newCtx, cancel := app.withCancel(ctx)
-	wrappedF := func() {
-		defer cancel()
-		f(newCtx)
+// GoForever GoForever
+func (app *App) GoForever(f func(context.Context), hooks ...Hook) {
+	wrapped := func() {
+		ctx := app.Context()
+		for _, hook := range hooks {
+			ctx = hook(ctx)
+		}
+		f(ctx)
 	}
-	app.GoAsync(wrappedF)
+	onStart := func() { app.wg.Add(1) }
+	onStop := func() { app.wg.Done() }
+	syncx.SafeLoopGoex(app.Context(), wrapped, onStart, onStop)
+}
+
+// GoForever GoForever
+func (app *App) GoAsyncForever(f func()) {
+	onStart := func() { app.wg.Add(1) }
+	onStop := func() { app.wg.Done() }
+	syncx.SafeLoopGoex(app.Context(), f, onStart, onStop)
 }
 
 // Close 结束这个应用
@@ -172,7 +108,6 @@ func (app *App) Close() {
 		shutdownHook()
 	}
 	app.cancel()
-	log.Info("grace exit")
 }
 
 // Wait 等待应用goroutine全部退出
@@ -192,15 +127,15 @@ func (app *App) Wait() {
 // AddChild 添加子应用
 func (app *App) AddChild(child *App) {
 	app.Lock()
+	defer app.Unlock()
 	app.children = append(app.children, child)
-	app.Unlock()
 }
 
 // AddShutdownHook 添加退出hook
 func (app *App) AddShutdownHook(hook func()) {
 	app.Lock()
+	defer app.Unlock()
 	app.shutdownHooks = append(app.shutdownHooks, hook)
-	app.Unlock()
 }
 
 // CatchExitSignal 捕获退出信号
@@ -241,22 +176,10 @@ func GoForever(f func(context.Context)) {
 	globalApp.GoForever(f)
 }
 
-// GoForeverContext GoForeverContext
-func GoForeverContext(ctx context.Context, f func(context.Context)) {
-	setupOnce.Do(setup)
-	globalApp.GoForeverContext(ctx, f)
-}
-
 // GoAsyncForever GoAsyncForever
 func GoAsyncForever(f func()) {
 	setupOnce.Do(setup)
 	globalApp.GoAsyncForever(f)
-}
-
-// GoAsyncForeverContext GoAsyncForeverContext
-func GoAsyncForeverContext(ctx context.Context, f func()) {
-	setupOnce.Do(setup)
-	globalApp.GoAsyncForeverContext(ctx, f)
 }
 
 // GoAsync GoAsync

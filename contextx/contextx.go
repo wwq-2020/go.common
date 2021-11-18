@@ -28,7 +28,7 @@ func Multi(ctxs ...context.Context) context.Context {
 func (m *multi) Deadline() (deadline time.Time, ok bool) {
 	var d time.Time
 	for _, ctx := range m.ctxs {
-		if cur, ok := ctx.Deadline(); ok && cur.Sub(d) < 0 {
+		if cur, ok := ctx.Deadline(); ok && cur.Before(d) {
 			d = cur
 		}
 	}
