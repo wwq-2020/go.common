@@ -20,6 +20,7 @@ type StackError interface {
 	FullFields() stack.Fields
 	WithTip(string) StackError
 	Tip() string
+	Format() string
 }
 
 // timeout timeout
