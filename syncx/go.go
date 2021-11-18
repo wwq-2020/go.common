@@ -58,6 +58,8 @@ func SafeLoopGo(ctx context.Context, f func()) {
 }
 
 func SafeLoopex(ctx context.Context, f func(), onStart, onStop func()) {
+	onStart()
+	defer onStop()
 	safeFunc := SafeFunc(f)
 	for {
 		safeFunc()
@@ -69,6 +71,8 @@ func SafeLoopex(ctx context.Context, f func(), onStart, onStop func()) {
 }
 
 func SafeLoopGoex(ctx context.Context, f func(), onStart, onStop func()) {
+	onStart()
+	defer onStop()
 	safeFunc := SafeFunc(f)
 	go func() {
 		for {
