@@ -53,8 +53,8 @@ func (app *App) Context() context.Context {
 
 // Go 开启应用goroutine
 func (app *App) Go(f func(context.Context), hooks ...Hook) {
+	app.wg.Add(1)
 	wrappedF := func() {
-		app.wg.Add(1)
 		defer app.wg.Done()
 		ctx := app.Context()
 		for _, hook := range hooks {
@@ -67,8 +67,8 @@ func (app *App) Go(f func(context.Context), hooks ...Hook) {
 
 // GoAsync 开启应用goroutine
 func (app *App) GoAsync(f func()) {
+	app.wg.Add(1)
 	wrappedF := func() {
-		app.wg.Add(1)
 		defer app.wg.Done()
 		f()
 	}
